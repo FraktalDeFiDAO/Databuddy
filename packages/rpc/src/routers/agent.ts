@@ -1,11 +1,25 @@
-import { RedisProvider } from "@ai-sdk-tools/memory/redis";
 import { redis } from "@databuddy/redis";
-import type { RedisClientType } from "redis";
+import type { UIMessage } from "ai";
 import { z } from "zod";
 import { protectedProcedure } from "../orpc";
 import { authorizeWebsiteAccess } from "../utils/auth";
 
-const memoryProvider = new RedisProvider(redis as unknown as RedisClientType);
+function chatKey(chatId: string): string {
+	return `chat:messages:${chatId}`;
+}
+
+async function loadMessages(
+	chatId: string,
+	limit: number
+): Promise<UIMessage[]> {
+	const raw = await redis.get(chatKey(chatId));
+	if (!raw) {
+		return [];
+	}
+
+	const messages = JSON.parse(raw as string) as UIMessage[];
+	return messages.slice(-limit);
+}
 
 export const agentRouter = {
 	getMessages: protectedProcedure
@@ -18,14 +32,11 @@ export const agentRouter = {
 		.handler(async ({ context, input }) => {
 			await authorizeWebsiteAccess(context, input.websiteId, "read");
 
-			const messages = await memoryProvider.getMessages({
-				chatId: input.chatId,
-				limit: 50,
-			});
+			const messages = await loadMessages(input.chatId, 50);
 
 			return {
 				success: true,
-				messages: messages ?? [],
+				messages,
 			};
 		}),
 

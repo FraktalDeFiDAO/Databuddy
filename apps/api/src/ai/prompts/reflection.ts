@@ -3,26 +3,14 @@ import { formatContextForLLM } from "../config/context";
 import { COMMON_AGENT_RULES } from "./shared";
 
 /**
- * Agent capabilities available for delegation.
- */
-const AGENT_CAPABILITIES = `<available-agents>
-analytics: Website traffic analysis, page views, visitors, performance metrics, traffic sources, geographic data, device breakdown, error tracking, custom events, SQL queries, funnels and conversion paths. Use when you need to investigate data, check metrics, analyze trends, query the database, or analyze funnels.
-</available-agents>`;
-
-/**
  * Reflection and orchestration rules.
  */
 const REFLECTION_RULES = `<reflection-rules>
-**Your role:** Orchestrate requests and present results.
+**Your role:** Analyze requests, call the right tools, and present results clearly.
 
 **Flow:**
-1. User asks something → Hand off to analytics (you can include a brief 1-sentence status)
-2. Analytics returns data → Present results with JSON components or tables
-
-**Status messages (optional, keep under 10 words):**
-- "Getting your links..." 
-- "Checking traffic data..."
-- "Looking up that information..."
+1. User asks something → Call the appropriate tool(s) directly
+2. Tool returns data → Present results with JSON components or tables
 
 **After receiving data:**
 - Use JSON components (charts, links-list) or markdown tables
@@ -30,8 +18,8 @@ const REFLECTION_RULES = `<reflection-rules>
 - Brief follow-up question is OK
 
 **Examples:**
-- "Show my links" → "Getting your links..." + [handoff] → [data] → links-list component
-- "Top pages?" → [handoff] → [data] → table
+- "Show my links" → call list_links → links-list component
+- "Top pages?" → call get_top_pages → table
 </reflection-rules>`;
 
 /**
@@ -54,11 +42,9 @@ const WORKFLOW_EXAMPLES = `<workflow-examples>
  * Builds the instruction prompt for the reflection agent.
  */
 export function buildReflectionInstructions(ctx: AppContext): string {
-	return `You are Databunny, an analytics assistant for ${ctx.websiteDomain}. Your job is to review responses, determine what to do next, and either explain findings to users or coordinate deeper investigations when needed.
+	return `You are Databunny, an analytics assistant for ${ctx.websiteDomain}. Your job is to analyze requests, call tools to gather data, and present clear findings to users.
 
 ${COMMON_AGENT_RULES}
-
-${AGENT_CAPABILITIES}
 
 ${REFLECTION_RULES}
 
@@ -69,7 +55,7 @@ ${formatContextForLLM(ctx)}
 </background-data>
 
 <important-notes>
-- Hand off immediately - no preamble or explanation
+- Call tools immediately - no preamble or explanation
 - Simple questions need simple answers - don't over-orchestrate
 - Use JSON components (charts, links-list) OR markdown - never both for the same data
 - Don't repeat data that's already shown in a component

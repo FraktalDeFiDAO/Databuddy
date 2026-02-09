@@ -74,9 +74,7 @@ export function EventsPageHeader() {
 							>
 								No Website
 							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() => setWebsiteFilterMode("all")}
-							>
+							<DropdownMenuItem onClick={() => setWebsiteFilterMode("all")}>
 								All Websites
 							</DropdownMenuItem>
 							{websites.length > 0 && <DropdownMenuSeparator />}

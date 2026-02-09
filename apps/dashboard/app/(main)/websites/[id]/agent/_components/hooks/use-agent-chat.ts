@@ -16,15 +16,11 @@ export function useAgentChatTransport(chatId: string) {
 				api: `${API_URL}/v1/agent/chat`,
 				credentials: "include",
 				prepareSendMessagesRequest({ messages }) {
-					const lastMessage = messages.at(-1);
-					if (!lastMessage) {
-						throw new Error("No messages to send");
-					}
 					return {
 						body: {
 							id: chatId,
 							websiteId,
-							message: lastMessage,
+							messages,
 							timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 						},
 					};

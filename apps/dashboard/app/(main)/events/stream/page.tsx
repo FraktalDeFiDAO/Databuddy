@@ -135,13 +135,8 @@ function ActiveFilters({ filters }: { filters: ActiveFilter[] }) {
 }
 
 export default function EventsStreamPage() {
-	const {
-		queryOptions,
-		websiteFilters,
-		dateRange,
-		hasQueryId,
-		isLoadingOrg,
-	} = useEventsPageContext();
+	const { queryOptions, websiteFilters, dateRange, hasQueryId, isLoadingOrg } =
+		useEventsPageContext();
 
 	const [page, setPage] = useState(1);
 	const [allEvents, setAllEvents] = useState<RecentCustomEvent[]>([]);

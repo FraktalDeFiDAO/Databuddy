@@ -131,7 +131,9 @@ export const ErrorsBuilders: Record<string, SimpleQueryConfig> = {
 			"uniq(anonymous_id) as users",
 		],
 		where: ["message != ''", "path != ''"],
-		groupBy: ["CASE WHEN trimRight(path(path), '/') = '' THEN '/' ELSE trimRight(path(path), '/') END"],
+		groupBy: [
+			"CASE WHEN trimRight(path(path), '/') = '' THEN '/' ELSE trimRight(path(path), '/') END",
+		],
 		orderBy: "errors DESC",
 		limit: 20,
 		timeField: "timestamp",

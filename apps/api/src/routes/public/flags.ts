@@ -576,9 +576,8 @@ export const flagsRoute = new Elysia({ prefix: "/v1/flags" })
 						properties: parseProperties(query.properties),
 					};
 
-					const allFlags = await record(
-						"fetchFlagsForClient",
-						() => getCachedFlagsForClient(query.clientId, query.environment)
+					const allFlags = await record("fetchFlagsForClient", () =>
+						getCachedFlagsForClient(query.clientId, query.environment)
 					);
 
 					setAttributes({

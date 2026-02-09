@@ -319,16 +319,16 @@ type ProjectType = "website" | "schedule" | "link" | "organization";
 
 type ProjectAccessResult =
 	| {
-		success: true;
-		projectId: string;
-		projectType: ProjectType;
-	}
+			success: true;
+			projectId: string;
+			projectType: ProjectType;
+	  }
 	| {
-		success: false;
-		error: string;
-		code: string;
-		status?: number;
-	};
+			success: false;
+			error: string;
+			code: string;
+			status?: number;
+	  };
 
 function createAuthFailedResponse(requestId: string): Response {
 	return new Response(
@@ -440,8 +440,7 @@ function verifyWebsiteAccess(
 		if (ctx.apiKey) {
 			if (hasGlobalAccess(ctx.apiKey)) {
 				if (ctx.apiKey.organizationId) {
-					const granted =
-						website.organizationId === ctx.apiKey.organizationId;
+					const granted = website.organizationId === ctx.apiKey.organizationId;
 					setAttributes({
 						access_result: granted ? "api_key_global" : "api_key_denied",
 					});
@@ -533,10 +532,7 @@ function verifyScheduleAccess(
 	});
 }
 
-function verifyLinkAccess(
-	ctx: AuthContext,
-	linkId: string
-): Promise<boolean> {
+function verifyLinkAccess(ctx: AuthContext, linkId: string): Promise<boolean> {
 	return record("verifyLinkAccess", async () => {
 		setAttributes({ access_check_type: "link", link_id: linkId });
 
@@ -809,12 +805,12 @@ function getTimeUnit(
 type ParameterInput =
 	| string
 	| {
-		name: string;
-		start_date?: string;
-		end_date?: string;
-		granularity?: string;
-		id?: string;
-	};
+			name: string;
+			start_date?: string;
+			end_date?: string;
+			granularity?: string;
+			id?: string;
+	  };
 
 function parseQueryParameter(param: ParameterInput) {
 	if (typeof param === "string") {

@@ -19,6 +19,8 @@ import { agentInputAtom } from "./agent-atoms";
 import { AgentChatProvider } from "./agent-chat-context";
 import { AgentInput } from "./agent-input";
 import { AgentMessages } from "./agent-messages";
+import { ChatHistory } from "./chat-history";
+import { usePersistChat } from "./hooks/use-persist-chat";
 import { NewChatButton } from "./new-chat-button";
 
 interface AgentPageContentProps {
@@ -52,18 +54,21 @@ const SUGGESTED_PROMPTS = [
 export function AgentPageContent({ chatId, websiteId }: AgentPageContentProps) {
 	return (
 		<AgentChatProvider chatId={chatId}>
-			<AgentPageContentInner websiteId={websiteId} />
+			<AgentPageContentInner chatId={chatId} websiteId={websiteId} />
 		</AgentChatProvider>
 	);
 }
 
 function AgentPageContentInner({
-	websiteId: _websiteId,
+	chatId,
+	websiteId,
 }: {
+	chatId: string;
 	websiteId: string;
 }) {
 	const setInputValue = useSetAtom(agentInputAtom);
 	const { messages } = useChat();
+	usePersistChat(chatId, websiteId);
 
 	const hasMessages = messages.length > 0;
 
@@ -98,9 +103,10 @@ function AgentPageContentInner({
 								Analytics co-pilot with instant answers and guided insights.
 							</p>
 						</div>
-						<div className="flex shrink-0 items-center gap-1.5">
-							<NewChatButton />
-						</div>
+					<div className="flex shrink-0 items-center gap-1.5">
+						<ChatHistory />
+						<NewChatButton />
+					</div>
 					</div>
 				</div>
 

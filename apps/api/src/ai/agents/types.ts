@@ -1,3 +1,5 @@
+import type { LanguageModel, StopCondition, ToolSet } from "ai";
+
 export interface AgentContext {
 	userId: string;
 	websiteId: string;
@@ -12,7 +14,10 @@ export type AgentType =
 	| "reflection"
 	| "reflection-max";
 
-export interface StreamConfig {
-	maxRounds: number;
-	maxSteps: number;
+export interface AgentConfig {
+	model: LanguageModel;
+	system: string;
+	tools: ToolSet;
+	stopWhen: StopCondition<ToolSet>;
+	temperature: number;
 }

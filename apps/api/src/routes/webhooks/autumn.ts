@@ -265,12 +265,12 @@ function verifyWebhookSignature(
 type WebhookBody =
 	| { type: string; data: ThresholdData | ProductsUpdatedData }
 	| {
-		customer: AutumnCustomer;
-		feature?: AutumnFeature;
-		threshold_type?: ThresholdType;
-		scenario?: ProductScenario;
-		updated_product?: { id: string; name: string };
-	};
+			customer: AutumnCustomer;
+			feature?: AutumnFeature;
+			threshold_type?: ThresholdType;
+			scenario?: ProductScenario;
+			updated_product?: { id: string; name: string };
+	  };
 
 export const autumnWebhook = new Elysia().post(
 	"/autumn",

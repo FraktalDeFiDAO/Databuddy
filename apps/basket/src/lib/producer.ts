@@ -223,11 +223,7 @@ export class EventProducer {
 								ch_chunk_size: this.config.chunkSize,
 							});
 
-							for (
-								let i = 0;
-								i < events.length;
-								i += this.config.chunkSize
-							) {
+							for (let i = 0; i < events.length; i += this.config.chunkSize) {
 								const chunk = events.slice(i, i + this.config.chunkSize);
 								await this.dependencies.clickHouse.insert({
 									table,

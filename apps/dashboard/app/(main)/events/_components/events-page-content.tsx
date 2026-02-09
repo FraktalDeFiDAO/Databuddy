@@ -51,13 +51,8 @@ const formatDateByGranularity = (
 };
 
 export function EventsPageContent() {
-	const {
-		queryOptions,
-		websiteFilters,
-		dateRange,
-		hasQueryId,
-		isLoadingOrg,
-	} = useEventsPageContext();
+	const { queryOptions, websiteFilters, dateRange, hasQueryId, isLoadingOrg } =
+		useEventsPageContext();
 
 	const { chartType, chartStepType } = useChartPreferences("events");
 

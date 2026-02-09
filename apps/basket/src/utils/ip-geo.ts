@@ -39,9 +39,7 @@ function loadDatabaseFromCdn(): Promise<Buffer> {
 			});
 
 			if (buf.length < 1_000_000) {
-				throw new Error(
-					`Database file seems too small: ${buf.length} bytes`
-				);
+				throw new Error(`Database file seems too small: ${buf.length} bytes`);
 			}
 
 			return buf;

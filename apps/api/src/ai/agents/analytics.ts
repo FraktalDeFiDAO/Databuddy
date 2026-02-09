@@ -1,7 +1,5 @@
-import { Agent } from "@ai-sdk-tools/agents";
-import type { LanguageModel } from "ai";
+import { type LanguageModel, stepCountIs } from "ai";
 import type { AppContext } from "../config/context";
-import { standardMemoryConfig } from "../config/memory";
 import { models } from "../config/models";
 import { buildAnalyticsInstructions } from "../prompts/analytics";
 import { createAnnotationTools } from "../tools/annotations";
@@ -11,7 +9,7 @@ import { createFunnelTools } from "../tools/funnels";
 import { getTopPagesTool } from "../tools/get-top-pages";
 import { createGoalTools } from "../tools/goals";
 import { createLinksTools } from "../tools/links";
-import type { AgentContext, StreamConfig } from "./types";
+import type { AgentConfig, AgentContext } from "./types";
 
 function createTools(context: AgentContext) {
 	const appContext: AppContext = {
@@ -35,27 +33,23 @@ function createTools(context: AgentContext) {
 	};
 }
 
-export const streamConfig: StreamConfig = {
-	maxRounds: 5,
-	maxSteps: 20,
-};
+export const maxSteps = 20;
 
-export function create(context: AgentContext) {
-	console.log("[Analytics Agent] Creating analytics agent");
-	return new Agent({
-		name: "analytics",
+export function createConfig(context: AgentContext): AgentConfig {
+	const appContext: AppContext = {
+		userId: context.userId,
+		websiteId: context.websiteId,
+		websiteDomain: context.websiteDomain,
+		timezone: context.timezone,
+		currentDateTime: new Date().toISOString(),
+		chatId: crypto.randomUUID(),
+	};
+
+	return {
 		model: models.analytics as LanguageModel,
-		temperature: 0.3,
-		instructions: (ctx) => {
-			const prompt = buildAnalyticsInstructions(ctx);
-			console.log("[Analytics Agent] Instructions length:", prompt.length);
-			return prompt;
-		},
-		memory: standardMemoryConfig,
-		maxTurns: 10,
+		system: buildAnalyticsInstructions(appContext),
 		tools: createTools(context),
-		modelSettings: {
-			failureMode: { maxAttempts: 2 },
-		},
-	});
+		stopWhen: stepCountIs(20),
+		temperature: 0.3,
+	};
 }

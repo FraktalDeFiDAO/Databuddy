@@ -1,6 +1,6 @@
 import { createClient, type ResponseJSON } from "@clickhouse/client";
 import type { NodeClickHouseClientConfigOptions } from "@clickhouse/client/dist/config";
-import { trace, SpanStatusCode } from "@opentelemetry/api";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 /**
  * ClickHouse table names used throughout the application
  */
@@ -114,10 +114,7 @@ export function chQueryWithMeta<T extends Record<string, any>>(
 				"db.stats.bytes_read",
 				json.statistics?.bytes_read ?? 0
 			);
-			span.setAttribute(
-				"db.stats.elapsed_sec",
-				json.statistics?.elapsed ?? 0
-			);
+			span.setAttribute("db.stats.elapsed_sec", json.statistics?.elapsed ?? 0);
 			span.setStatus({ code: SpanStatusCode.OK });
 
 			const response = {

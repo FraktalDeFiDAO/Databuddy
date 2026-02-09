@@ -1,52 +1,82 @@
-import { Agent } from "@ai-sdk-tools/agents";
-import type { LanguageModel } from "ai";
-import { maxMemoryConfig, standardMemoryConfig } from "../config/memory";
+import { type LanguageModel, stepCountIs } from "ai";
+import type { AppContext } from "../config/context";
 import { models } from "../config/models";
 import { buildReflectionInstructions } from "../prompts/reflection";
-import * as analytics from "./analytics";
-import type { AgentContext, StreamConfig } from "./types";
+import { createAnnotationTools } from "../tools/annotations";
+import { executeQueryBuilderTool } from "../tools/execute-query-builder";
+import { executeSqlQueryTool } from "../tools/execute-sql-query";
+import { createFunnelTools } from "../tools/funnels";
+import { getTopPagesTool } from "../tools/get-top-pages";
+import { createGoalTools } from "../tools/goals";
+import { createLinksTools } from "../tools/links";
+import type { AgentConfig, AgentContext } from "./types";
 
-export const streamConfig: StreamConfig = {
-	maxRounds: 5,
-	maxSteps: 20,
-};
+function createTools(context: AgentContext) {
+	const appContext: AppContext = {
+		userId: context.userId,
+		websiteId: context.websiteId,
+		websiteDomain: context.websiteDomain,
+		timezone: context.timezone,
+		currentDateTime: new Date().toISOString(),
+		chatId: crypto.randomUUID(),
+		requestHeaders: context.requestHeaders,
+	};
 
-export const maxStreamConfig: StreamConfig = {
-	maxRounds: 10,
-	maxSteps: 40,
-};
-
-export function create(context: AgentContext) {
-	console.log("[Reflection Agent] Creating reflection agent");
-	return new Agent({
-		name: "reflection",
-		model: models.analytics as LanguageModel,
-		temperature: 0,
-		instructions: (ctx) => {
-			const prompt = buildReflectionInstructions(ctx);
-			console.log("[Reflection Agent] Instructions length:", prompt.length);
-			return prompt;
-		},
-		memory: standardMemoryConfig,
-		maxTurns: 15,
-		handoffs: [analytics.create(context)],
-		modelSettings: {
-			failureMode: { maxAttempts: 2 },
-		},
-	});
+	return {
+		get_top_pages: getTopPagesTool,
+		execute_query_builder: executeQueryBuilderTool,
+		execute_sql_query: executeSqlQueryTool,
+		...createFunnelTools(appContext),
+		...createGoalTools(appContext),
+		...createAnnotationTools(appContext),
+		...createLinksTools(appContext),
+	};
 }
 
-export function createMax(context: AgentContext) {
-	return new Agent({
-		name: "reflection-max",
-		model: models.advanced as LanguageModel,
+export const maxSteps = 20;
+export const maxMaxSteps = 40;
+
+/**
+ * Reflection agent with orchestration prompt and all analytics tools.
+ * Previously used handoffs to analytics, now handles tools directly.
+ */
+export function createConfig(context: AgentContext): AgentConfig {
+	const appContext: AppContext = {
+		userId: context.userId,
+		websiteId: context.websiteId,
+		websiteDomain: context.websiteDomain,
+		timezone: context.timezone,
+		currentDateTime: new Date().toISOString(),
+		chatId: crypto.randomUUID(),
+	};
+
+	return {
+		model: models.analytics as LanguageModel,
+		system: buildReflectionInstructions(appContext),
+		tools: createTools(context),
+		stopWhen: stepCountIs(20),
 		temperature: 0,
-		instructions: buildReflectionInstructions,
-		memory: maxMemoryConfig,
-		maxTurns: 20,
-		handoffs: [analytics.create(context)],
-		modelSettings: {
-			failureMode: { maxAttempts: 2 },
-		},
-	});
+	};
+}
+
+/**
+ * Advanced reflection agent with more powerful model and higher step limit.
+ */
+export function createMaxConfig(context: AgentContext): AgentConfig {
+	const appContext: AppContext = {
+		userId: context.userId,
+		websiteId: context.websiteId,
+		websiteDomain: context.websiteDomain,
+		timezone: context.timezone,
+		currentDateTime: new Date().toISOString(),
+		chatId: crypto.randomUUID(),
+	};
+
+	return {
+		model: models.advanced as LanguageModel,
+		system: buildReflectionInstructions(appContext),
+		tools: createTools(context),
+		stopWhen: stepCountIs(40),
+		temperature: 0,
+	};
 }

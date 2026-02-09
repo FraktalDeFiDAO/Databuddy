@@ -9,7 +9,7 @@
     "@ai-sdk/provider": "^3.0.5",
     "@anthropic-ai/sdk": "^0.39.0",
     "@types/node": "^20.0.0",
-    "ai": "^5.0.51",
+    "ai": "^6.0.0",
     "openai": "^4.77.0",
     "tokenlens": "^2.0.0-alpha.3",
     "typescript": "catalog:",
@@ -18,7 +18,7 @@
   "peerDependencies": {
     "@ai-sdk/provider": "^3.0.5",
     "@anthropic-ai/sdk": "^0.30.0",
-    "ai": "^5.0.51",
+    "ai": "^6.0.0",
     "openai": "^4.0.0",
     "tokenlens": "^2.0.0-alpha.3"
   },

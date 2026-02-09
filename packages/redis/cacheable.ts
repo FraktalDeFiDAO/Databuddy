@@ -98,7 +98,7 @@ function triggerBackgroundRevalidation<T>(
 	key: string,
 	fn: () => Promise<T>,
 	expireInSec: number,
-	staleTime: number,
+	staleTime: number
 ) {
 	if (activeRevalidations.has(key)) {
 		return;
@@ -106,10 +106,9 @@ function triggerBackgroundRevalidation<T>(
 
 	const work = (async () => {
 		const redis = getRedisCache();
-		const ttl = await withTimeout(
-			redis.ttl(key),
-			REDIS_TIMEOUT_MS,
-		).catch(() => expireInSec);
+		const ttl = await withTimeout(redis.ttl(key), REDIS_TIMEOUT_MS).catch(
+			() => expireInSec
+		);
 
 		if (ttl >= staleTime) {
 			return;
@@ -120,11 +119,11 @@ function triggerBackgroundRevalidation<T>(
 			const serialized = JSON.stringify(fresh);
 			await withTimeout(
 				redis.setex(key, expireInSec, serialized),
-				REDIS_TIMEOUT_MS,
-			).catch(() => { });
+				REDIS_TIMEOUT_MS
+			).catch(() => {});
 		}
 	})()
-		.catch(() => { })
+		.catch(() => {})
 		.finally(() => activeRevalidations.delete(key));
 
 	activeRevalidations.set(key, work);
@@ -182,7 +181,7 @@ export function cacheable<
 							key,
 							() => fn(...args),
 							expireInSec,
-							staleTime,
+							staleTime
 						);
 					}
 
@@ -228,7 +227,7 @@ export function cacheable<
 							const redis = getRedisCache();
 							withTimeout(
 								redis.setex(key, expireInSec, serialized),
-								REDIS_TIMEOUT_MS,
+								REDIS_TIMEOUT_MS
 							).catch(() => markRedisUnhealthy());
 						} catch {
 							// JSON.stringify failed — do NOT affect redis state
@@ -244,7 +243,7 @@ export function cacheable<
 				} finally {
 					inflightRequests.delete(key);
 				}
-			},
+			}
 		);
 	};
 
