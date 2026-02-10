@@ -15,7 +15,10 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useAgentChatId } from "./agent-chat-context";
-import { useChatList } from "./hooks/use-chat-db";
+import {
+	clearLastChatId,
+	useChatList,
+} from "./hooks/use-chat-db";
 
 dayjs.extend(relativeTime);
 
@@ -32,14 +35,18 @@ export function ChatHistory() {
 		router.push(`/websites/${websiteId}/agent/${chatId}`);
 	};
 
-	const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+	const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
 		e.stopPropagation();
-		await removeChat(chatId);
+		removeChat(chatId);
 
 		if (chatId === currentChatId) {
-			const nextChat = chats.find((c) => c.id !== chatId);
+			const remaining = chats.filter((c) => c.id !== chatId);
+			const nextChat = remaining.at(0);
 			if (nextChat) {
 				router.push(`/websites/${websiteId}/agent/${nextChat.id}`);
+			} else {
+				clearLastChatId(websiteId);
+				router.push(`/websites/${websiteId}/agent`);
 			}
 		}
 	};

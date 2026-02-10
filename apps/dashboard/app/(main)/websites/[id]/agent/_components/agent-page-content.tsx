@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRightIcon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
+import { useEffect } from "react";
 import { BrainIcon } from "@phosphor-icons/react/dist/ssr/Brain";
 import { ChartBarIcon } from "@phosphor-icons/react/dist/ssr/ChartBar";
 import { LightningIcon } from "@phosphor-icons/react/dist/ssr/Lightning";
@@ -20,6 +21,7 @@ import { AgentChatProvider } from "./agent-chat-context";
 import { AgentInput } from "./agent-input";
 import { AgentMessages } from "./agent-messages";
 import { ChatHistory } from "./chat-history";
+import { setLastChatId } from "./hooks/use-chat-db";
 import { NewChatButton } from "./new-chat-button";
 
 interface AgentPageContentProps {
@@ -51,6 +53,9 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export function AgentPageContent({ chatId, websiteId }: AgentPageContentProps) {
+	useEffect(() => {
+		setLastChatId(websiteId, chatId);
+	}, [websiteId, chatId]);
 	return (
 		<AgentChatProvider chatId={chatId}>
 			<AgentPageContentInner chatId={chatId} websiteId={websiteId} />

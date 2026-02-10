@@ -201,9 +201,10 @@ export const agent = new Elysia({ prefix: "/v1/agent" })
 						requestHeaders: request.headers,
 					});
 
-					// Messages come directly from the frontend (useChat manages the full history)
 					const uiMessages = body.messages as UIMessage[];
-					const modelMessages = convertToModelMessages(uiMessages);
+					const modelMessages = await convertToModelMessages(uiMessages, {
+						tools: config.tools,
+					});
 
 					const result = streamText({
 						model: config.model,

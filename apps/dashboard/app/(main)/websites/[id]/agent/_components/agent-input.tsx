@@ -55,7 +55,6 @@ export function AgentInput() {
 
 		const text = input.trim();
 
-		// Save chat to IndexedDB for history / restore
 		const title = getChatTitle(messages, text);
 		saveChat({ id: currentChatId, websiteId, title });
 
