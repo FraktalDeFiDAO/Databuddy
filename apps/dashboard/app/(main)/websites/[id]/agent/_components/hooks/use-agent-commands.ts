@@ -1,4 +1,3 @@
-import { useDebouncedCallback } from "@tanstack/react-pacer";
 import { useAtom, useSetAtom } from "jotai";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useChat } from "@/contexts/chat-context";
@@ -19,18 +18,6 @@ export function useAgentCommands() {
 
 	const { sendMessage } = useChat();
 
-	const debouncedSetCommandQuery = useDebouncedCallback(
-		(query: string) => {
-			setCommandQuery(query);
-			if (query) {
-				setShowCommands(true);
-			} else {
-				setShowCommands(false);
-			}
-		},
-		{ wait: 200 }
-	);
-
 	const filteredCommands = useMemo(
 		() => filterCommands(localQuery),
 		[localQuery]
@@ -40,9 +27,8 @@ export function useAgentCommands() {
 		setShowCommands(false);
 		setLocalQuery("");
 		setCommandQuery("");
-		// Focus the input when commands are hidden
 		inputRef.current?.focus();
-	}, [setCommandQuery]);
+	}, [setCommandQuery, setShowCommands]);
 
 	const handleInputChange = useCallback(
 		(value: string, cursorPosition: number) => {
@@ -50,17 +36,18 @@ export function useAgentCommands() {
 
 			const textBeforeCursor = value.substring(0, cursorPosition);
 			const lastSlashIndex = textBeforeCursor.lastIndexOf("/");
+			const isSlashAtStart = lastSlashIndex === 0;
 
-			if (lastSlashIndex !== -1) {
+			if (lastSlashIndex !== -1 && isSlashAtStart) {
 				const query = textBeforeCursor.substring(lastSlashIndex + 1);
 				setLocalQuery(query);
-				debouncedSetCommandQuery(query);
+				setCommandQuery(query);
+				setShowCommands(true);
 			} else {
-				setLocalQuery("");
 				hideCommands();
 			}
 		},
-		[setInput, debouncedSetCommandQuery, hideCommands]
+		[setInput, setCommandQuery, setShowCommands, hideCommands]
 	);
 
 	const executeCommand = useCallback(
