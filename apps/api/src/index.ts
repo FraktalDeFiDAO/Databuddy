@@ -22,6 +22,7 @@ import {
 } from "./lib/tracing";
 import { agent } from "./routes/agent";
 import { health } from "./routes/health";
+import { mcp } from "./routes/mcp";
 import { publicApi } from "./routes/public";
 import { query } from "./routes/query";
 import { webhooks } from "./routes/webhooks/index";
@@ -57,6 +58,9 @@ const app = new Elysia()
 	)
 	.use(publicApi)
 	.use(health)
+	.get("/.well-known/oauth-authorization-server", () =>
+		new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } })
+	)
 	.use(webhooks)
 	.onBeforeHandle(function startTrace({ request, path, store }) {
 		const method = request.method;
@@ -109,6 +113,7 @@ const app = new Elysia()
 	)
 	.use(query)
 	.use(agent)
+	.use(mcp)
 	.all(
 		"/rpc/*",
 		async ({ request, store }) => {
@@ -148,8 +153,8 @@ const app = new Elysia()
 		}
 	)
 	.onError(function handleError({ error, code, store }) {
+		const statusCode = code === "NOT_FOUND" ? 404 : 500;
 		if (store.tracing?.span && store.tracing.startTime) {
-			const statusCode = code === "NOT_FOUND" ? 404 : 500;
 			endRequestSpan(store.tracing.span, statusCode, store.tracing.startTime);
 		}
 
@@ -165,7 +170,7 @@ const app = new Elysia()
 					: "An internal server error occurred",
 				code: code ?? "INTERNAL_SERVER_ERROR",
 			}),
-			{ status: 500, headers: { "Content-Type": "application/json" } }
+			{ status: statusCode, headers: { "Content-Type": "application/json" } }
 		);
 	});
 

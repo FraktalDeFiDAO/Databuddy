@@ -3,7 +3,6 @@ import {
 	and,
 	db,
 	eq,
-	inArray,
 	isNull,
 	links,
 	member,
@@ -13,6 +12,7 @@ import {
 import { filterOptions } from "@databuddy/shared/lists/filters";
 import type { CustomQueryRequest } from "@databuddy/shared/types/custom-query";
 import { Elysia, t } from "elysia";
+import { getAccessibleWebsites } from "../lib/accessible-websites";
 import {
 	type ApiKeyRow,
 	getAccessibleWebsiteIds,
@@ -319,16 +319,16 @@ type ProjectType = "website" | "schedule" | "link" | "organization";
 
 type ProjectAccessResult =
 	| {
-			success: true;
-			projectId: string;
-			projectType: ProjectType;
-	  }
+		success: true;
+		projectId: string;
+		projectType: ProjectType;
+	}
 	| {
-			success: false;
-			error: string;
-			code: string;
-			status?: number;
-	  };
+		success: false;
+		error: string;
+		code: string;
+		status?: number;
+	};
 
 function createAuthFailedResponse(requestId: string): Response {
 	return new Response(
@@ -730,59 +730,6 @@ async function resolveProjectAccess(
 	};
 }
 
-async function getAccessibleWebsites(authCtx: AuthContext) {
-	const select = {
-		id: websites.id,
-		name: websites.name,
-		domain: websites.domain,
-		isPublic: websites.isPublic,
-		createdAt: websites.createdAt,
-	};
-
-	if (authCtx.user) {
-		const userMemberships = await db.query.member.findMany({
-			where: eq(member.userId, authCtx.user.id),
-			columns: { organizationId: true },
-		});
-		const orgIds = userMemberships.map((m) => m.organizationId);
-
-		if (orgIds.length === 0) {
-			return [];
-		}
-
-		return db
-			.select(select)
-			.from(websites)
-			.where(inArray(websites.organizationId, orgIds))
-			.orderBy((t) => t.createdAt);
-	}
-
-	if (authCtx.apiKey) {
-		if (hasGlobalAccess(authCtx.apiKey)) {
-			if (!authCtx.apiKey.organizationId) {
-				return [];
-			}
-			return db
-				.select(select)
-				.from(websites)
-				.where(eq(websites.organizationId, authCtx.apiKey.organizationId))
-				.orderBy((t) => t.createdAt);
-		}
-
-		const ids = getAccessibleWebsiteIds(authCtx.apiKey);
-		if (ids.length === 0) {
-			return [];
-		}
-		return db
-			.select(select)
-			.from(websites)
-			.where(inArray(websites.id, ids))
-			.orderBy((t) => t.createdAt);
-	}
-
-	return [];
-}
-
 function getTimeUnit(
 	granularity?: string,
 	from?: string,
@@ -805,12 +752,12 @@ function getTimeUnit(
 type ParameterInput =
 	| string
 	| {
-			name: string;
-			start_date?: string;
-			end_date?: string;
-			granularity?: string;
-			id?: string;
-	  };
+		name: string;
+		start_date?: string;
+		end_date?: string;
+		granularity?: string;
+		id?: string;
+	};
 
 function parseQueryParameter(param: ParameterInput) {
 	if (typeof param === "string") {

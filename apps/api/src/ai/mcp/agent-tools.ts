@@ -1,0 +1,244 @@
+import { tool } from "ai";
+import { z } from "zod";
+import { getAccessibleWebsites } from "../../lib/accessible-websites";
+import {
+	getAccessibleWebsiteIds,
+	hasGlobalAccess,
+	hasKeyScope,
+	hasWebsiteScope,
+} from "../../lib/api-key";
+import { getWebsiteDomain, validateWebsite } from "../../lib/website-utils";
+import { executeQuery, QueryBuilders } from "../../query";
+import type { QueryRequest } from "../../query/types";
+import { createAnnotationTools } from "../tools/annotations";
+import { createFunnelTools } from "../tools/funnels";
+import { createGoalTools } from "../tools/goals";
+import { createLinksTools } from "../tools/links";
+import {
+	executeTimedQuery,
+	SQL_VALIDATION_ERROR,
+	validateSQL,
+} from "../tools/utils";
+
+export interface McpAgentContext {
+	requestHeaders: Headers;
+	apiKey: Awaited<
+		ReturnType<typeof import("../../lib/api-key").getApiKeyFromHeader>
+	>;
+	userId: string | null;
+}
+
+function getContext(ctx: unknown): McpAgentContext {
+	if (!ctx || typeof ctx !== "object" || !("requestHeaders" in ctx)) {
+		throw new Error(
+			"MCP agent tools require context with requestHeaders and apiKey"
+		);
+	}
+	return ctx as McpAgentContext;
+}
+
+async function ensureWebsiteAccess(
+	websiteId: string,
+	ctx: McpAgentContext
+): Promise<{ domain: string } | Error> {
+	const validation = await validateWebsite(websiteId);
+	if (!(validation.success && validation.website)) {
+		return new Error(validation.error ?? "Website not found");
+	}
+	const { website } = validation;
+
+	if (website.isPublic) {
+		return { domain: website.domain ?? "unknown" };
+	}
+
+	if (ctx.apiKey) {
+		if (!hasKeyScope(ctx.apiKey, "read:data")) {
+			return new Error("API key missing read:data scope");
+		}
+		const accessibleIds = getAccessibleWebsiteIds(ctx.apiKey);
+		const hasWebsiteAccess =
+			hasWebsiteScope(ctx.apiKey, websiteId, "read:data") ||
+			accessibleIds.includes(websiteId) ||
+			(hasGlobalAccess(ctx.apiKey) &&
+				ctx.apiKey.organizationId === website.organizationId);
+		if (!hasWebsiteAccess) {
+			return new Error("Access denied to this website");
+		}
+		return { domain: website.domain ?? "unknown" };
+	}
+
+	return new Error("Authentication required");
+}
+
+interface TopPageRow extends Record<string, unknown> {
+	path: string;
+	views: number;
+	unique_visitors: number;
+}
+
+export function createMcpAgentTools() {
+	return {
+		list_websites: tool({
+			description:
+				"List all websites accessible with the current API key. Call this FIRST to discover website IDs before any analytics query. Required before get_top_pages, execute_query_builder, or execute_sql_query.",
+			strict: true,
+			inputSchema: z.object({}),
+			execute: async (_args, options) => {
+				const experimental_context = (
+					options as { experimental_context?: unknown }
+				).experimental_context;
+				const ctx = getContext(experimental_context);
+				const authCtx = {
+					user: ctx.userId ? { id: ctx.userId } : null,
+					apiKey: ctx.apiKey,
+				};
+				const list = await getAccessibleWebsites(authCtx);
+				return {
+					websites: list.map((w) => ({
+						id: w.id,
+						name: w.name,
+						domain: w.domain,
+						isPublic: w.isPublic,
+					})),
+					total: list.length,
+				};
+			},
+		}),
+		get_top_pages: tool({
+			description:
+				"Get top pages by page views for a website. Use websiteId from list_websites.",
+			strict: true,
+			inputSchema: z.object({
+				websiteId: z.string(),
+				limit: z.number().min(1).max(50).default(10),
+				days: z.number().min(1).max(90).default(7),
+			}),
+			execute: async (args, options) => {
+				const { websiteId, limit, days } = args;
+				const experimental_context = (
+					options as { experimental_context?: unknown }
+				).experimental_context;
+				const ctx = getContext(experimental_context);
+				const access = await ensureWebsiteAccess(websiteId, ctx);
+				if (access instanceof Error) {
+					throw new Error(access.message);
+				}
+				const sql = `
+					SELECT path, COUNT(*) AS views, uniq(anonymous_id) AS unique_visitors
+					FROM analytics.events 
+					WHERE client_id = {websiteId:String} AND event_name = 'screen_view' AND path != ''
+					AND time >= today() - INTERVAL {days:UInt32} DAY
+					GROUP BY path ORDER BY views DESC LIMIT {limit:UInt32}
+				`;
+				const result = await executeTimedQuery<TopPageRow>(
+					"MCP Agent Top Pages",
+					sql,
+					{ websiteId, days, limit },
+					{ websiteId, limit, days }
+				);
+				if (result.rowCount === 0) {
+					return {
+						pages: [],
+						summary: "No page views found.",
+						period: `Last ${days} days`,
+					};
+				}
+				const totalViews = result.data.reduce((s, p) => s + Number(p.views), 0);
+				return {
+					pages: result.data.map((p) => ({
+						path: p.path,
+						views: Number(p.views),
+						uniqueVisitors: Number(p.unique_visitors),
+						percentage: ((Number(p.views) / totalViews) * 100).toFixed(1),
+					})),
+					summary: `${result.rowCount} pages, ${totalViews.toLocaleString()} views in last ${days} days`,
+					totalViews,
+					period: `Last ${days} days`,
+				};
+			},
+		}),
+		execute_query_builder: tool({
+			description: `Pre-built analytics queries. Types: ${Object.keys(QueryBuilders).join(", ")}. Preferred for traffic, sessions, devices, etc.`,
+			strict: true,
+			inputSchema: z.object({
+				websiteId: z.string(),
+				type: z.string(),
+				from: z.string(),
+				to: z.string(),
+				timeUnit: z.enum(["minute", "hour", "day", "week", "month"]).optional(),
+				filters: z.array(z.record(z.string(), z.unknown())).optional(),
+				groupBy: z.array(z.string()).optional(),
+				orderBy: z.string().optional(),
+				limit: z.number().min(1).max(1000).optional(),
+				offset: z.number().min(0).optional(),
+				timezone: z.string().optional(),
+			}),
+			execute: async (args, options) => {
+				const experimental_context = (
+					options as { experimental_context?: unknown }
+				).experimental_context;
+				const ctx = getContext(experimental_context);
+				const access = await ensureWebsiteAccess(args.websiteId, ctx);
+				if (access instanceof Error) {
+					throw new Error(access.message);
+				}
+				const websiteDomain =
+					(await getWebsiteDomain(args.websiteId)) ?? "unknown";
+				const queryRequest: QueryRequest = {
+					projectId: args.websiteId,
+					type: args.type,
+					from: args.from,
+					to: args.to,
+					timeUnit: args.timeUnit,
+					filters: args.filters as QueryRequest["filters"],
+					groupBy: args.groupBy,
+					orderBy: args.orderBy,
+					limit: args.limit,
+					offset: args.offset,
+					timezone: args.timezone ?? "UTC",
+				};
+				const data = await executeQuery(
+					queryRequest,
+					websiteDomain,
+					queryRequest.timezone
+				);
+				return { data, rowCount: data.length, type: args.type };
+			},
+		}),
+		execute_sql_query: tool({
+			description:
+				"Custom read-only ClickHouse SQL. SELECT/WITH only. Use {paramName:Type} for parameters. websiteId is auto-included.",
+			strict: true,
+			inputSchema: z.object({
+				websiteId: z.string(),
+				sql: z.string(),
+				params: z.record(z.string(), z.unknown()).optional(),
+			}),
+			execute: async (args, options) => {
+				const { websiteId, sql, params } = args;
+				const experimental_context = (
+					options as { experimental_context?: unknown }
+				).experimental_context;
+				const ctx = getContext(experimental_context);
+				const access = await ensureWebsiteAccess(websiteId, ctx);
+				if (access instanceof Error) {
+					throw new Error(access.message);
+				}
+				if (!validateSQL(sql)) {
+					throw new Error(SQL_VALIDATION_ERROR);
+				}
+				const result = await executeTimedQuery(
+					"MCP Agent SQL",
+					sql,
+					{ websiteId, ...(params ?? {}) },
+					{ websiteId }
+				);
+				return result;
+			},
+		}),
+		...createFunnelTools(),
+		...createGoalTools(),
+		...createAnnotationTools(),
+		...createLinksTools(),
+	};
+}

@@ -155,11 +155,20 @@ Rules:
 - After showing a component, you can add a brief follow-up question but don't repeat the data
 </agent-specific-rules>`;
 
+const MCP_DISCOVERY_PREAMBLE = `<mcp-context>
+**CRITICAL - YOU HAVE NO WEBSITE PRE-SELECTED:**
+- You MUST call list_websites FIRST before any analytics query
+- Use the website IDs returned from list_websites for all tools (get_top_pages, execute_query_builder, execute_sql_query, goals, funnels, annotations, links)
+- If only one website exists, use it. If multiple, use the first or the most relevant
+</mcp-context>
+
+`;
+
 /**
  * Builds the instruction prompt for the analytics agent.
  */
 export function buildAnalyticsInstructions(ctx: AppContext): string {
-	return `You are Databunny, an analytics assistant for ${ctx.websiteDomain}. Your goal is to analyze website traffic, user behavior, and performance metrics.
+  return `You are Databunny, an analytics assistant for ${ctx.websiteDomain}. Your goal is to analyze website traffic, user behavior, and performance metrics.
 
 ${COMMON_AGENT_RULES}
 
@@ -167,6 +176,39 @@ ${ANALYTICS_RULES}
 
 <background-data>
 ${formatContextForLLM(ctx)}
+</background-data>
+
+${CLICKHOUSE_SCHEMA_DOCS}`;
+}
+
+/**
+ * Builds the same analytics instructions for MCP (API key, no pre-selected website).
+ * Reuses COMMON_AGENT_RULES, ANALYTICS_RULES, and CLICKHOUSE_SCHEMA_DOCS.
+ */
+export function buildAnalyticsInstructionsForMcp(ctx: {
+  timezone?: string;
+  currentDateTime: string;
+}): string {
+  const timezone = ctx.timezone ?? "UTC";
+  return `You are Databunny, an analytics assistant for Databuddy. Your goal is to analyze website traffic, user behavior, and performance metrics.
+
+${MCP_DISCOVERY_PREAMBLE}
+
+${COMMON_AGENT_RULES}
+
+${ANALYTICS_RULES}
+
+<background-data>
+<current_date>${ctx.currentDateTime}</current_date>
+<timezone>${timezone}</timezone>
+<website_id>Obtain from list_websites - call it first</website_id>
+<website_domain>Obtain from list_websites result</website_domain>
+
+IMPORTANT CONTEXT VALUES:
+- Use current_date for time-sensitive operations
+- Use website_id from list_websites result when calling get_top_pages, execute_query_builder, execute_sql_query
+- Use execute_query_builder for pre-built analytics queries (preferred over custom SQL)
+- Use execute_sql_query only when you need custom SQL that isn't covered by query builders
 </background-data>
 
 ${CLICKHOUSE_SCHEMA_DOCS}`;
