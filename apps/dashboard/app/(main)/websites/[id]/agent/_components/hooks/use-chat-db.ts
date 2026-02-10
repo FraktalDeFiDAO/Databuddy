@@ -107,6 +107,8 @@ export function clearLastChatId(websiteId: string): void {
 	safeRemoveItem(lastChatKey(websiteId));
 }
 
+const EMPTY_CHAT_LIST_STATE: ChatListState = { chats: [], isLoading: false };
+
 const chatListCache = new Map<string, ChatListState>();
 const chatListSubscribers = new Map<string, Set<() => void>>();
 
@@ -166,7 +168,7 @@ export function useChatList(websiteId: string) {
 	);
 
 	const getServerSnapshot = useCallback(
-		(): ChatListState => ({ chats: [], isLoading: false }),
+		(): ChatListState => EMPTY_CHAT_LIST_STATE,
 		[]
 	);
 
