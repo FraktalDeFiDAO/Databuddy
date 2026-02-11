@@ -96,6 +96,7 @@ const openApiHandler = new OpenAPIHandler(docsRouter, {
 			specPath: "/spec.json",
 			docsPath: "/",
 			docsTitle: "Databuddy API",
+			docsConfig: { theme: "deepSpace" },
 			specGenerateOptions: {
 				info: {
 					title: "Databuddy API",
