@@ -36,9 +36,9 @@ const goalOutputSchema = z.object({
 	ignoreHistoricData: z.boolean(),
 	isActive: z.boolean(),
 	createdBy: z.string(),
-	createdAt: z.date(),
-	updatedAt: z.date(),
-	deletedAt: z.date().nullable(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date(),
+	deletedAt: z.nullable(z.coerce.date()),
 });
 
 const successOutputSchema = z.object({ success: z.literal(true) });

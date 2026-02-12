@@ -45,10 +45,10 @@ const apiKeyOutputSchema = z.object({
 	scopes: z.array(z.string()),
 	tags: z.array(z.string()),
 	expiresAt: z.string().nullable(),
-	revokedAt: z.date().nullable(),
+	revokedAt: z.nullable(z.coerce.date()),
 	lastUsedAt: z.string().nullable(),
-	createdAt: z.date(),
-	updatedAt: z.date(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date(),
 });
 
 const apiKeyFullOutputSchema = apiKeyOutputSchema.extend({

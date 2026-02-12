@@ -82,7 +82,7 @@ const toAnalyticsSteps = (steps: Step[]): AnalyticsStep[] =>
 	}));
 
 const funnelListOutputSchema = z.object({
-	createdAt: z.date(),
+	createdAt: z.coerce.date(),
 	description: z.string().nullable(),
 	filters: z.unknown().nullable(),
 	id: z.string(),
@@ -90,13 +90,13 @@ const funnelListOutputSchema = z.object({
 	isActive: z.boolean(),
 	name: z.string(),
 	steps: z.unknown(),
-	updatedAt: z.date(),
+	updatedAt: z.coerce.date(),
 });
 
 const funnelOutputSchema = z.object({
-	createdAt: z.date(),
+	createdAt: z.coerce.date(),
 	createdBy: z.string(),
-	deletedAt: z.date().nullable(),
+	deletedAt: z.nullable(z.coerce.date()),
 	description: z.string().nullable(),
 	filters: z.unknown().nullable(),
 	id: z.string(),
@@ -104,7 +104,7 @@ const funnelOutputSchema = z.object({
 	isActive: z.boolean(),
 	name: z.string(),
 	steps: z.unknown(),
-	updatedAt: z.date(),
+	updatedAt: z.coerce.date(),
 	websiteId: z.string(),
 });
 

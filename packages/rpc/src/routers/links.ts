@@ -89,7 +89,7 @@ const linkOutputSchema = z.object({
 	slug: z.string(),
 	name: z.string(),
 	targetUrl: z.string(),
-	expiresAt: z.date().nullable(),
+	expiresAt: z.nullable(z.coerce.date()),
 	expiredRedirectUrl: z.string().nullable(),
 	ogTitle: z.string().nullable(),
 	ogDescription: z.string().nullable(),
@@ -98,9 +98,9 @@ const linkOutputSchema = z.object({
 	iosUrl: z.string().nullable(),
 	androidUrl: z.string().nullable(),
 	externalId: z.string().nullable(),
-	deletedAt: z.date().nullable(),
-	createdAt: z.date(),
-	updatedAt: z.date(),
+	deletedAt: z.nullable(z.coerce.date()),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date(),
 });
 
 interface LinkRecord {
