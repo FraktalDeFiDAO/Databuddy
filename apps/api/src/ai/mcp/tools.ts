@@ -1,4 +1,4 @@
-import { websitesApi } from "@databuddy/auth";
+import { auth, websitesApi } from "@databuddy/auth";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { getAccessibleWebsites } from "../../lib/accessible-websites";
@@ -61,6 +61,11 @@ async function ensureWebsiteAccess(
 		if (!hasWebsiteAccess) {
 			return new Error("Access denied to this website");
 		}
+		return { domain: website.domain ?? "unknown" };
+	}
+
+	const session = await auth.api.getSession({ headers });
+	if (session?.user?.role === "ADMIN") {
 		return { domain: website.domain ?? "unknown" };
 	}
 

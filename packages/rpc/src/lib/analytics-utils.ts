@@ -286,7 +286,7 @@ const buildStepQuery = (
 			WHERE ${base} AND event_name = {t${idx}:String}${filterSQL}
 			UNION ALL
 			SELECT COALESCE(anonymous_id, session_id, '') as vid, timestamp as ts FROM analytics.custom_events
-			WHERE website_id = {websiteId:String}
+			WHERE (owner_id = {websiteId:String} OR website_id = {websiteId:String})
 				AND ${buildTimeRangeWhere("timestamp")}
 				AND event_name = {t${idx}:String}
 				AND coalesce(anonymous_id, session_id, '') != ''
@@ -391,9 +391,9 @@ const queryFunnelErrors = async (
 			   AND time >= parseDateTimeBestEffort({startDate:String})
 			   AND time <= parseDateTimeBestEffort({endDate:String})
 			   AND event_name = {firstStepTarget:String}
-			   UNION
+			   UNION ALL
 			   SELECT DISTINCT anonymous_id FROM analytics.custom_events
-			   WHERE website_id = {websiteId:String}
+			   WHERE (owner_id = {websiteId:String} OR website_id = {websiteId:String})
 			   AND timestamp >= parseDateTimeBestEffort({startDate:String})
 			   AND timestamp <= parseDateTimeBestEffort({endDate:String})
 			   AND event_name = {firstStepTarget:String}
@@ -612,7 +612,6 @@ export const processFunnelAnalytics = async (
 	};
 };
 
-// Goal analytics (single step)
 export const processGoalAnalytics = async (
 	steps: AnalyticsStep[],
 	filters: Filter[],
@@ -622,9 +621,10 @@ export const processGoalAnalytics = async (
 	const filterSQL = buildFilterSQL(filters, params);
 	const step = steps[0];
 
+	const sql = `WITH events AS (${buildStepQuery(step, 0, filterSQL, params)})
+		 SELECT DISTINCT step, vid, ts FROM events`;
 	const rows = await chQuery<{ step: number; vid: string; ts: number }>(
-		`WITH events AS (${buildStepQuery(step, 0, filterSQL, params)})
-		 SELECT DISTINCT step, vid, ts FROM events`,
+		sql,
 		params
 	);
 

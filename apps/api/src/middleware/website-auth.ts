@@ -114,7 +114,12 @@ async function checkWebsiteAuth(
 
 	// Check session-based authentication
 	if (sessionUser && typeof sessionUser === "object" && "id" in sessionUser) {
-		const userId = (sessionUser as { id: string }).id;
+		const userObj = sessionUser as { id: string; role?: string };
+		if (userObj.role === "ADMIN") {
+			return null;
+		}
+
+		const userId = userObj.id;
 
 		if (!website.organizationId) {
 			return json(403, {

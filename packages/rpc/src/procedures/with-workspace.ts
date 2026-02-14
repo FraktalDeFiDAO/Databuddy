@@ -304,6 +304,16 @@ export async function withWorkspace<R extends ResourceType = "organization">(
 	const plan = (context.billing?.planId ?? "free") as PlanId;
 	validatePlan(plan, requiredPlans);
 
+	if (context.user.role === "ADMIN") {
+		return {
+			organizationId,
+			user: context.user,
+			role: "admin",
+			plan,
+			isPublicAccess: false,
+		};
+	}
+
 	let role: string | null;
 	try {
 		role = await getOrganizationRole(context.user.id, organizationId);
@@ -457,6 +467,19 @@ export async function withWebsite(
 		throw new ORPCError("FORBIDDEN", {
 			message: "Website must belong to a workspace",
 		});
+	}
+
+	if (context.user.role === "ADMIN") {
+		return {
+			workspace: {
+				organizationId: website.organizationId,
+				user: context.user,
+				role: "admin",
+				plan,
+				isPublicAccess: false,
+			},
+			website,
+		};
 	}
 
 	let role: string | null;

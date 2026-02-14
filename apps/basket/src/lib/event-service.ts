@@ -2,16 +2,11 @@ import { randomUUID } from "node:crypto";
 import type {
 	AICallSpan,
 	AnalyticsEvent,
-	CustomEventSpan,
 	CustomOutgoingLink,
 	ErrorSpanRow,
 	WebVitalsSpan,
 } from "@databuddy/db";
-import type {
-	CustomEventSpanInput,
-	ErrorSpan,
-	IndividualVital,
-} from "@databuddy/validation";
+import type { ErrorSpan, IndividualVital } from "@databuddy/validation";
 import { sendEvent, sendEventBatch } from "@lib/producer";
 import { checkDuplicate, getDailySalt, saltAnonymousId } from "@lib/security";
 import { captureError, record, setAttributes } from "@lib/tracing";
@@ -234,53 +229,6 @@ export function insertOutgoingLink(
 			sendEvent("analytics-outgoing-links", outgoingLinkEvent);
 		} catch (error) {
 			captureError(error, { eventId });
-		}
-	});
-}
-
-/**
- * Insert lean custom event spans (v2.x format)
- */
-export function insertCustomEventSpans(
-	events: CustomEventSpanInput[],
-	clientId: string
-): Promise<void> {
-	return record("insertCustomEventSpans", async () => {
-		if (events.length === 0) {
-			return;
-		}
-
-		setAttributes({
-			batch_type: "custom_event_span",
-			batch_size: events.length,
-			client_id: clientId,
-		});
-
-		const salt = await getDailySalt();
-		const now = Date.now();
-		const spans: CustomEventSpan[] = events.map((event) => {
-			const rawId = sanitizeString(
-				event.anonymousId,
-				VALIDATION_LIMITS.SHORT_STRING_MAX_LENGTH
-			);
-			return {
-				client_id: clientId,
-				anonymous_id: rawId ? saltAnonymousId(rawId, salt) : rawId,
-				session_id: validateSessionId(event.sessionId),
-				timestamp: typeof event.timestamp === "number" ? event.timestamp : now,
-				path: sanitizeString(event.path, VALIDATION_LIMITS.STRING_MAX_LENGTH),
-				event_name: sanitizeString(
-					event.eventName,
-					VALIDATION_LIMITS.SHORT_STRING_MAX_LENGTH
-				),
-				properties: (event.properties as Record<string, unknown>) ?? {},
-			};
-		});
-
-		try {
-			await sendEventBatch("analytics-custom-event-spans", spans);
-		} catch (error) {
-			captureError(error, { count: spans.length });
 		}
 	});
 }

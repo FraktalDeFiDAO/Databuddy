@@ -98,6 +98,10 @@ export async function authorizeWebsiteAccess(
 		});
 	}
 
+	if (ctx.user?.role === "ADMIN") {
+		return website;
+	}
+
 	if (permission === "read" && website.isPublic) {
 		return website;
 	}
@@ -159,6 +163,10 @@ export async function isFullyAuthorized(
 			return false;
 		}
 
+		if (ctx.user?.role === "ADMIN") {
+			return true;
+		}
+
 		// Public access is not "fully authorized" - it's demo access
 		if (!ctx.user) {
 			return false;
@@ -198,6 +206,10 @@ export async function authorizeUptimeScheduleAccess(
 		throw new ORPCError("UNAUTHORIZED", {
 			message: "Authentication is required for this action",
 		});
+	}
+
+	if (ctx.user.role === "ADMIN") {
+		return;
 	}
 
 	try {

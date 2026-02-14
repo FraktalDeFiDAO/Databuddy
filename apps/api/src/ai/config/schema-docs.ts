@@ -163,35 +163,6 @@ const ANALYTICS_TABLES: TableDef[] = [
 		additionalInfo: "SummingMergeTree with 1 year TTL",
 	},
 	{
-		name: "analytics.custom_event_spans",
-		description:
-			"Custom tracked events (e.g., button clicks, form submissions)",
-		keyColumns: [
-			"client_id (String)",
-			"anonymous_id (String)",
-			"session_id (String)",
-			"timestamp (DateTime64)",
-			"path (String) - Page where event occurred",
-			"event_name (String) - Custom event name",
-			"properties (String) - JSON string with event properties",
-		],
-		additionalInfo: "Has bloom filter indexes on session_id and event_name",
-	},
-	{
-		name: "analytics.custom_events_hourly",
-		description: "Hourly aggregated custom event statistics",
-		keyColumns: [
-			"client_id (String)",
-			"path (String)",
-			"event_name (String)",
-			"hour (DateTime)",
-			"event_count (UInt64)",
-			"unique_users (AggregateFunction) - Unique users who triggered event",
-			"unique_sessions (AggregateFunction) - Unique sessions with event",
-		],
-		additionalInfo: "AggregatingMergeTree with 1 year TTL",
-	},
-	{
 		name: "analytics.outgoing_links",
 		description: "External links clicked by users",
 		keyColumns: [

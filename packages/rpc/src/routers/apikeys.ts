@@ -96,9 +96,12 @@ const verifyOutputSchema = z.discriminatedUnion("valid", [
 const getMeta = (key: ApiKey): Metadata => (key.metadata as Metadata) ?? {};
 
 async function verifyOrganizationAccess(
-	ctx: Pick<Context, "headers">,
+	ctx: Pick<Context, "headers" | "user">,
 	organizationId: string
 ) {
+	if (ctx.user?.role === "ADMIN") {
+		return;
+	}
 	try {
 		const { success } = await websitesApi.hasPermission({
 			headers: ctx.headers,

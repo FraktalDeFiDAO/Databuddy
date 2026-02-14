@@ -356,6 +356,7 @@ export const goalsRouter = {
 				key: cacheKey,
 				ttl: ANALYTICS_CACHE_TTL,
 				tables: ["goals"],
+				disabled: true,
 				queryFn: async () => {
 					const steps: AnalyticsStep[] = [
 						{
@@ -372,8 +373,7 @@ export const goalsRouter = {
 						effectiveStartDate,
 						endDate
 					);
-
-					return processGoalAnalytics(
+					return await processGoalAnalytics(
 						steps,
 						filters,
 						{

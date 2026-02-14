@@ -1,3 +1,4 @@
+import { auth } from "@databuddy/auth";
 import { tool } from "ai";
 import { z } from "zod";
 import { getAccessibleWebsites } from "../../lib/accessible-websites";
@@ -68,6 +69,11 @@ async function ensureWebsiteAccess(
 		return { domain: website.domain ?? "unknown" };
 	}
 
+	const session = await auth.api.getSession({ headers: ctx.requestHeaders });
+	if (session?.user?.role === "ADMIN") {
+		return { domain: website.domain ?? "unknown" };
+	}
+
 	return new Error("Authentication required");
 }
 
@@ -89,8 +95,18 @@ export function createMcpAgentTools() {
 					options as { experimental_context?: unknown }
 				).experimental_context;
 				const ctx = getContext(experimental_context);
+				const session = ctx.userId
+					? await auth.api.getSession({ headers: ctx.requestHeaders })
+					: null;
 				const authCtx = {
-					user: ctx.userId ? { id: ctx.userId } : null,
+					user: session?.user
+						? {
+								id: session.user.id,
+								role: (session.user as { role?: string }).role,
+							}
+						: ctx.userId
+							? { id: ctx.userId }
+							: null,
 					apiKey: ctx.apiKey,
 				};
 				const list = await getAccessibleWebsites(authCtx);

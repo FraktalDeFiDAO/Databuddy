@@ -88,7 +88,7 @@ export function GoalItem({
 	className,
 }: GoalItemProps) {
 	const conversionRate = analytics?.overall_conversion_rate ?? 0;
-	const totalUsers = analytics?.total_users_entered ?? 0;
+	const totalUsers = analytics?.total_users_completed ?? 0;
 
 	return (
 		<div className={cn("border-border border-b", className)}>

@@ -235,9 +235,13 @@ function generateRequestId(): string {
 
 interface AuthContext {
 	apiKey: ApiKeyRow | null;
-	user: { id: string; name: string; email: string } | null;
+	user: { id: string; name: string; email: string; role?: string } | null;
 	isAuthenticated: boolean;
 	authMethod: "api_key" | "session" | "none";
+}
+
+function isAdminUser(user: AuthContext["user"]): boolean {
+	return Boolean(user && "role" in user && user.role === "ADMIN");
 }
 
 type ProjectType = "website" | "schedule" | "link" | "organization";
@@ -347,6 +351,11 @@ function verifyWebsiteAccess(
 			return false;
 		}
 
+		if (isAdminUser(ctx.user)) {
+			setAttributes({ access_result: "admin" });
+			return true;
+		}
+
 		if (website.isPublic) {
 			setAttributes({ access_result: "public" });
 			return true;
@@ -425,6 +434,11 @@ function verifyScheduleAccess(
 			return false;
 		}
 
+		if (isAdminUser(ctx.user)) {
+			setAttributes({ access_result: "admin" });
+			return true;
+		}
+
 		if (!ctx.isAuthenticated) {
 			setAttributes({ access_result: "unauthenticated" });
 			return false;
@@ -473,6 +487,11 @@ function verifyLinkAccess(ctx: AuthContext, linkId: string): Promise<boolean> {
 		if (!link) {
 			setAttributes({ access_result: "not_found" });
 			return false;
+		}
+
+		if (isAdminUser(ctx.user)) {
+			setAttributes({ access_result: "admin" });
+			return true;
 		}
 
 		if (!ctx.isAuthenticated) {
@@ -524,6 +543,11 @@ function verifyOrganizationAccess(
 			access_check_type: "organization",
 			organization_id: organizationId,
 		});
+
+		if (isAdminUser(ctx.user)) {
+			setAttributes({ access_result: "admin" });
+			return true;
+		}
 
 		if (!ctx.isAuthenticated) {
 			setAttributes({ access_result: "unauthenticated" });

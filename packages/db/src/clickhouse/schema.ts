@@ -299,50 +299,6 @@ SETTINGS index_granularity = 8192
 `;
 
 /**
- * Lean custom event spans table
- * Uses JSON for flexible metadata
- */
-const CREATE_CUSTOM_EVENT_SPANS_TABLE = `
-CREATE TABLE IF NOT EXISTS ${DATABASES.ANALYTICS}.custom_event_spans (
-  client_id String CODEC(ZSTD(1)),
-  anonymous_id String CODEC(ZSTD(1)),
-  session_id String CODEC(ZSTD(1)),
-  
-  timestamp DateTime64(3, 'UTC') CODEC(Delta(8), ZSTD(1)),
-  path String CODEC(ZSTD(1)),
-  
-  event_name LowCardinality(String) CODEC(ZSTD(1)),
-  properties String CODEC(ZSTD(1)),
-  
-  INDEX idx_session_id session_id TYPE bloom_filter(0.01) GRANULARITY 1,
-  INDEX idx_event_name event_name TYPE bloom_filter(0.01) GRANULARITY 1
-) ENGINE = MergeTree
-PARTITION BY toDate(timestamp)
-ORDER BY (client_id, event_name, path, timestamp)
-SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1
-`;
-
-/**
- * Hourly aggregated custom events
- */
-const CREATE_CUSTOM_EVENTS_HOURLY_TABLE = `
-CREATE TABLE IF NOT EXISTS ${DATABASES.ANALYTICS}.custom_events_hourly (
-  client_id String CODEC(ZSTD(1)),
-  path String CODEC(ZSTD(1)),
-  event_name LowCardinality(String) CODEC(ZSTD(1)),
-  hour DateTime CODEC(Delta(4), ZSTD(1)),
-  
-  event_count UInt64 CODEC(ZSTD(1)),
-  unique_users AggregateFunction(uniq, String),
-  unique_sessions AggregateFunction(uniq, String)
-) ENGINE = AggregatingMergeTree
-PARTITION BY toYYYYMM(hour)
-ORDER BY (client_id, event_name, path, hour)
-TTL toDateTime(hour) + INTERVAL 1 YEAR
-SETTINGS index_granularity = 8192
-`;
-
-/**
  * Daily aggregated pageviews for mini-charts
  */
 const CREATE_DAILY_PAGEVIEWS_TABLE = `
@@ -358,24 +314,6 @@ PARTITION BY toYYYYMM(date)
 ORDER BY (client_id, date)
 TTL toDateTime(date) + INTERVAL 1 YEAR
 SETTINGS index_granularity = 8192
-`;
-
-/**
- * Materialized view for custom events hourly aggregation
- */
-const CREATE_CUSTOM_EVENTS_HOURLY_MV = `
-CREATE MATERIALIZED VIEW IF NOT EXISTS ${DATABASES.ANALYTICS}.custom_events_hourly_mv
-TO ${DATABASES.ANALYTICS}.custom_events_hourly
-AS SELECT
-  client_id,
-  path,
-  event_name,
-  toStartOfHour(timestamp) AS hour,
-  count() AS event_count,
-  uniqState(anonymous_id) AS unique_users,
-  uniqState(session_id) AS unique_sessions
-FROM ${DATABASES.ANALYTICS}.custom_event_spans
-GROUP BY client_id, path, event_name, hour
 `;
 
 /**
@@ -697,19 +635,6 @@ export interface EmailEvent {
 }
 
 /**
- * Lean custom event span (website-scoped)
- */
-export interface CustomEventSpan {
-	client_id: string;
-	anonymous_id: string;
-	session_id: string;
-	timestamp: number;
-	path: string;
-	event_name: string;
-	properties: Record<string, unknown>;
-}
-
-/**
  * Organization-scoped custom event
  * owner_id: org ID from API key (required)
  * website_id: optional website scope
@@ -725,19 +650,6 @@ export interface CustomEvent {
 	anonymous_id?: string;
 	session_id?: string;
 	source?: string;
-}
-
-/**
- * Custom events hourly aggregate type
- */
-export interface CustomEventsHourlyAggregate {
-	client_id: string;
-	path: string;
-	event_name: string;
-	hour: number;
-	event_count: number;
-	unique_users: number;
-	unique_sessions: number;
 }
 
 /**
@@ -953,11 +865,6 @@ export async function initClickHouseSchema() {
 			{ name: "error_hourly", query: CREATE_ERROR_HOURLY_TABLE },
 			{ name: "web_vitals_spans", query: CREATE_WEB_VITALS_SPANS_TABLE },
 			{ name: "web_vitals_hourly", query: CREATE_WEB_VITALS_HOURLY_TABLE },
-			{ name: "custom_event_spans", query: CREATE_CUSTOM_EVENT_SPANS_TABLE },
-			{
-				name: "custom_events_hourly",
-				query: CREATE_CUSTOM_EVENTS_HOURLY_TABLE,
-			},
 			{ name: "daily_pageviews", query: CREATE_DAILY_PAGEVIEWS_TABLE },
 			{ name: "blocked_traffic", query: CREATE_BLOCKED_TRAFFIC_TABLE },
 			{ name: "email_events", query: CREATE_EMAIL_EVENTS_TABLE },
@@ -973,10 +880,6 @@ export async function initClickHouseSchema() {
 		const materializedViews = [
 			{ name: "error_hourly_mv", query: CREATE_ERROR_HOURLY_MV },
 			{ name: "web_vitals_hourly_mv", query: CREATE_WEB_VITALS_HOURLY_MV },
-			{
-				name: "custom_events_hourly_mv",
-				query: CREATE_CUSTOM_EVENTS_HOURLY_MV,
-			},
 			{ name: "daily_pageviews_mv", query: CREATE_DAILY_PAGEVIEWS_MV },
 		];
 

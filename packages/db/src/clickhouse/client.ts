@@ -11,7 +11,6 @@ export const TABLE_NAMES = {
 	email_events: "analytics.email_events",
 	error_spans: "analytics.error_spans",
 	web_vitals_spans: "analytics.web_vitals_spans",
-	custom_event_spans: "analytics.custom_event_spans",
 	custom_events: "analytics.custom_events",
 	ai_call_spans: "observability.ai_call_spans",
 	ai_traffic_spans: "analytics.ai_traffic_spans",

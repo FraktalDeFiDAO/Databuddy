@@ -14,7 +14,7 @@ export interface WebsiteSummary {
 }
 
 export interface AccessibleWebsitesAuth {
-	user: { id: string } | null;
+	user: { id: string; role?: string } | null;
 	apiKey: ApiKeyRow | null;
 }
 
@@ -28,6 +28,13 @@ export async function getAccessibleWebsites(
 		isPublic: websites.isPublic,
 		createdAt: websites.createdAt,
 	};
+
+	if (authCtx.user?.role === "ADMIN") {
+		return db
+			.select(select)
+			.from(websites)
+			.orderBy((t) => t.createdAt);
+	}
 
 	if (authCtx.user) {
 		const userMemberships = await db.query.member.findMany({

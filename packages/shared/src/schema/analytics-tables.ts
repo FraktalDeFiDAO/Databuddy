@@ -145,22 +145,6 @@ const WEB_VITALS_SPANS_TABLE: TableDefinition = {
 };
 
 /**
- * Custom event spans table - user-defined events
- */
-const CUSTOM_EVENT_SPANS_TABLE: TableDefinition = {
-	name: "custom_event_spans",
-	database: "analytics",
-	label: "Custom Events",
-	description: "User-defined custom events",
-	primaryTimeField: "timestamp",
-	clientIdField: "client_id",
-	columns: [
-		col("path", "string", "Path"),
-		col("event_name", "string", "Event Name"),
-	],
-};
-
-/**
  * Outgoing links table - external link clicks
  */
 const OUTGOING_LINKS_TABLE: TableDefinition = {
@@ -183,7 +167,6 @@ export const ANALYTICS_TABLES: TableDefinition[] = [
 	EVENTS_TABLE,
 	ERROR_SPANS_TABLE,
 	WEB_VITALS_SPANS_TABLE,
-	CUSTOM_EVENT_SPANS_TABLE,
 	OUTGOING_LINKS_TABLE,
 ];
 
