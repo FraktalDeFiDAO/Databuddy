@@ -167,7 +167,7 @@ function trackToolCompletion(
 	success: boolean,
 	extra?: Record<string, unknown>
 ): void {
-	trackAgentEvent("mcp_tool_completed", {
+	trackAgentEvent("agent_tool_completed", {
 		source: "mcp",
 		tool,
 		duration_ms: Date.now() - startTime,
