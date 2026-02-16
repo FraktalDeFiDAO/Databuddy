@@ -506,6 +506,7 @@ CREATE TABLE IF NOT EXISTS ${DATABASES.ANALYTICS}.revenue (
   
   anonymous_id Nullable(String) CODEC(ZSTD(1)),
   session_id Nullable(String) CODEC(ZSTD(1)),
+  customer_id Nullable(String) CODEC(ZSTD(1)),
   
   product_id Nullable(String) CODEC(ZSTD(1)),
   product_name Nullable(String) CODEC(ZSTD(1)),

@@ -42,6 +42,7 @@ const ATTRIBUTION_CTE = `
 			r.type,
 			r.anonymous_id as r_anonymous_id,
 			r.session_id as r_session_id,
+			r.customer_id as r_customer_id,
 			r.product_id,
 			r.product_name,
 			r.provider,
@@ -83,6 +84,7 @@ const ATTRIBUTION_CTE = `
 			rb.type,
 			rb.r_anonymous_id,
 			rb.r_session_id,
+			rb.r_customer_id,
 			rb.product_id,
 			rb.product_name,
 			rb.provider,
@@ -143,7 +145,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 					countIf(type = 'subscription') as subscription_count,
 					sumIf(amount, type = 'sale') as sale_revenue,
 					countIf(type = 'sale') as sale_count,
-					uniq(r_anonymous_id) as unique_customers,
+					uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as unique_customers,
 					countIf(is_attributed = 1 AND type != 'refund') as attributed_transactions,
 					sumIf(amount, is_attributed = 1 AND type != 'refund') as attributed_revenue
 				FROM revenue_attributed
@@ -162,7 +164,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 					toDate(created) as date,
 					sumIf(amount, type != 'refund') as revenue,
 					countIf(type != 'refund') as transactions,
-					uniq(r_anonymous_id) as customers,
+					uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 					sumIf(amount, is_attributed = 1 AND type != 'refund') as attributed_revenue,
 					countIf(is_attributed = 1 AND type != 'refund') as attributed_transactions
 				FROM revenue_attributed
@@ -183,7 +185,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 					provider as name,
 					sumIf(amount, type != 'refund') as revenue,
 					countIf(type != 'refund') as transactions,
-					uniq(r_anonymous_id) as customers,
+					uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 					ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 				FROM revenue_attributed
 				GROUP BY provider
@@ -213,7 +215,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						product_id,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY product_name, product_id
@@ -236,7 +238,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 					CASE WHEN is_attributed = 1 THEN 'Attributed' ELSE 'Unattributed' END as name,
 					sumIf(amount, type != 'refund') as revenue,
 					countIf(type != 'refund') as transactions,
-					uniq(r_anonymous_id) as customers,
+					uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 					ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 				FROM revenue_attributed
 				GROUP BY is_attributed
@@ -269,7 +271,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -307,7 +309,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -342,7 +344,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -377,7 +379,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -412,7 +414,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -447,7 +449,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -483,14 +485,16 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 							END as referrer_name,
 							amount,
 							type,
-							r_anonymous_id
+							r_anonymous_id,
+							r_customer_id,
+							transaction_id
 						FROM revenue_attributed
 					)
 					SELECT 
 						referrer_name as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM referrer_agg
 					GROUP BY referrer_name
@@ -525,7 +529,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -560,7 +564,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -595,7 +599,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
@@ -631,7 +635,7 @@ export const RevenueBuilders: Record<string, SimpleQueryConfig> = {
 						END as name,
 						sumIf(amount, type != 'refund') as revenue,
 						countIf(type != 'refund') as transactions,
-						uniq(r_anonymous_id) as customers,
+						uniq(coalesce(nullIf(trim(r_anonymous_id), ''), r_customer_id, transaction_id)) as customers,
 						ROUND((sumIf(amount, type != 'refund') / nullIf(SUM(sumIf(amount, type != 'refund')) OVER(), 0)) * 100, 2) as percentage
 					FROM revenue_attributed
 					GROUP BY name
