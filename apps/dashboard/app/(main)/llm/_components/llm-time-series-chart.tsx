@@ -1,7 +1,7 @@
 "use client";
 
 import { ChartLineIcon } from "@phosphor-icons/react/dist/ssr/ChartLine";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
 	Area,
 	CartesianGrid,

@@ -13,7 +13,10 @@ interface FieldPathInputProps {
 	onChange: (value: string[]) => void;
 }
 
-export function FieldPathInput({ value = EMPTY_PATHS, onChange }: FieldPathInputProps) {
+export function FieldPathInput({
+	value = EMPTY_PATHS,
+	onChange,
+}: FieldPathInputProps) {
 	const [inputValue, setInputValue] = useState("");
 	const [error, setError] = useState<string | null>(null);
 

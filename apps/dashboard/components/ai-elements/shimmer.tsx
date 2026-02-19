@@ -1,11 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import {
-	type CSSProperties,
-	type ElementType,
-	memo,
-} from "react";
+import { type CSSProperties, type ElementType, memo } from "react";
 import { cn } from "@/lib/utils";
 
 export interface TextShimmerProps {
@@ -82,10 +78,7 @@ function ShimmerSpan({
 	);
 }
 
-const ShimmerComponent = ({
-	as = "p",
-	...props
-}: TextShimmerProps) => {
+const ShimmerComponent = ({ as = "p", ...props }: TextShimmerProps) => {
 	if (as === "span") {
 		return <ShimmerSpan {...props} />;
 	}
