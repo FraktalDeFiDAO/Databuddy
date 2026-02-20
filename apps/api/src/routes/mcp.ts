@@ -98,7 +98,7 @@ export const mcp = new Elysia({ prefix: "/v1/mcp" })
 
 		const transport = new WebStandardStreamableHTTPServerTransport({
 			sessionIdGenerator: undefined,
-			enableJsonResponse: true,
+			enableJsonResponse: false,
 		});
 		await mcpServer.connect(transport);
 		const response = await transport.handleRequest(request);
