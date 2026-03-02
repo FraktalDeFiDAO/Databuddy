@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckIcon, PaperPlaneIcon, SpinnerIcon } from "@phosphor-icons/react";
+import { PaperPlaneIcon, SpinnerIcon } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SciFiButton } from "@/components/landing/scifi-btn";
@@ -51,9 +52,9 @@ function FormField({
 }
 
 export default function ContactForm() {
+	const router = useRouter();
 	const [formData, setFormData] = useState<ContactData>(initialFormData);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [isSubmitted, setIsSubmitted] = useState(false);
 	const [errors, setErrors] = useState<
 		Partial<Record<keyof ContactData, string>>
 	>({});
@@ -130,7 +131,7 @@ export default function ContactForm() {
 						? new Date(String(data.resetTime)).toLocaleTimeString()
 						: "soon";
 					throw new Error(
-						`Too many submissions. Please try again after ${resetTime}.`,
+						`Too many submissions. Please try again after ${resetTime}.`
 					);
 				}
 
@@ -139,12 +140,12 @@ export default function ContactForm() {
 						? (data.details as string[]).join("\n• ")
 						: String(data.error || "Validation failed");
 					throw new Error(
-						`Please fix the following issues:\n• ${errorMessage}`,
+						`Please fix the following issues:\n• ${errorMessage}`
 					);
 				}
 
 				throw new Error(
-					String(data.error || "Submission failed. Please try again."),
+					String(data.error || "Submission failed. Please try again.")
 				);
 			}
 
@@ -152,12 +153,12 @@ export default function ContactForm() {
 				description: "We'll get back to you as soon as possible.",
 				duration: 5000,
 			});
-			setIsSubmitted(true);
+			router.push("/contact/thanks");
 		} catch (error) {
 			if (error instanceof Error) {
 				if (error.name === "AbortError") {
 					toast.error(
-						"Request timed out. Please check your connection and try again.",
+						"Request timed out. Please check your connection and try again."
 					);
 				} else {
 					const errorLines = error.message.split("\n");
@@ -177,28 +178,6 @@ export default function ContactForm() {
 			setIsSubmitting(false);
 		}
 	};
-
-	if (isSubmitted) {
-		return (
-			<SciFiCard
-				className="flex h-full items-center justify-center rounded border border-green-500/50 bg-green-500/5 p-8 backdrop-blur-sm"
-				cornerColor="bg-green-500"
-			>
-				<div className="text-center">
-					<CheckIcon
-						className="mx-auto mb-4 size-12 text-green-500"
-						weight="duotone"
-					/>
-					<h3 className="mb-2 font-semibold text-foreground text-xl">
-						Message Sent!
-					</h3>
-					<p className="text-muted-foreground text-sm">
-						Thanks for reaching out. We'll get back to you as soon as possible.
-					</p>
-				</div>
-			</SciFiCard>
-		);
-	}
 
 	return (
 		<SciFiCard className="rounded border border-border bg-card/50 p-5 backdrop-blur-sm sm:p-6">
