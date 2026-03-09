@@ -99,6 +99,10 @@ const config: NextConfig = {
 			},
 			{
 				protocol: "https" as const,
+				hostname: "media.marblecms.com",
+			},
+			{
+				protocol: "https" as const,
 				hostname: "lh3.googleusercontent.com",
 			},
 			{
