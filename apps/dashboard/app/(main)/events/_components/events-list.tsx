@@ -2,16 +2,23 @@
 
 import { LightningIcon } from "@phosphor-icons/react";
 import { TableEmptyState } from "@/components/table/table-empty-state";
+import { EVENT_COLORS } from "./events-trend-chart";
 import { formatCompactNumber } from "./events-utils";
 import type { CustomEventItem } from "./types";
 
 interface EventsListProps {
 	events: CustomEventItem[];
+	eventColorMap?: Map<string, string>;
 	isLoading?: boolean;
 	isFetching?: boolean;
 }
 
-export function EventsList({ events, isLoading, isFetching }: EventsListProps) {
+export function EventsList({
+	events,
+	eventColorMap,
+	isLoading,
+	isFetching,
+}: EventsListProps) {
 	if (isLoading) {
 		return <EventsListSkeleton />;
 	}
@@ -71,11 +78,20 @@ export function EventsList({ events, isLoading, isFetching }: EventsListProps) {
 							key={event.name}
 						>
 							<div
-								className="absolute inset-y-0 left-0 bg-primary/6 transition-all group-hover:bg-primary/10"
-								style={{ width: `${barWidth}%` }}
+								className="absolute inset-y-0 left-0 transition-all"
+								style={{
+									width: `${barWidth}%`,
+									backgroundColor: `${eventColorMap?.get(event.name) ?? EVENT_COLORS[0]}0F`,
+								}}
 							/>
 							<div className="relative z-10 flex items-center gap-2.5">
-								<div className="size-2 shrink-0 rounded bg-primary" />
+								<div
+									className="size-2 shrink-0 rounded-full"
+									style={{
+										backgroundColor:
+											eventColorMap?.get(event.name) ?? EVENT_COLORS[0],
+									}}
+								/>
 								<span className="truncate font-medium text-foreground text-sm">
 									{event.name}
 								</span>

@@ -1,25 +1,46 @@
-// Enhanced Custom Tooltip for Error Chart
-export const ErrorChartTooltip = ({ active, payload, label }: any) => {
-	if (!(active && payload && payload.length)) {
+export const ErrorChartTooltip = ({
+	active,
+	payload,
+	label,
+}: {
+	active?: boolean;
+	payload?: Array<{
+		dataKey: string;
+		name: string;
+		value: number;
+		color: string;
+	}>;
+	label?: string;
+}) => {
+	if (!(active && payload?.length)) {
 		return null;
 	}
 
 	return (
-		<div className="rounded-lg border border-sidebar-border bg-background/95 p-4 text-sm shadow-lg backdrop-blur-sm">
-			<p className="mb-3 font-semibold text-foreground">{label}</p>
-			<div className="space-y-2">
-				{payload.map((entry: any) => (
+		<div className="min-w-[160px] rounded border bg-popover p-2.5 shadow-lg">
+			{label && (
+				<div className="mb-2 flex items-center gap-2 border-b pb-2">
+					<div className="size-1.5 animate-pulse rounded-full bg-primary" />
+					<p className="font-medium text-foreground text-xs">{label}</p>
+				</div>
+			)}
+			<div className="space-y-1">
+				{payload.map((entry) => (
 					<div
-						className="flex items-center gap-3"
-						key={`tooltip-${entry.dataKey}-${entry.value}`}
+						className="flex items-center justify-between gap-3"
+						key={entry.dataKey}
 					>
-						<div
-							className="size-3 rounded-full"
-							style={{ backgroundColor: entry.color }}
-						/>
-						<span className="text-muted-foreground">{entry.name}:</span>
-						<span className="font-semibold text-foreground">
-							{entry.value.toLocaleString()}
+						<div className="flex items-center gap-1.5">
+							<div
+								className="size-2 rounded-full"
+								style={{ backgroundColor: entry.color }}
+							/>
+							<span className="text-muted-foreground text-xs">
+								{entry.name}
+							</span>
+						</div>
+						<span className="font-semibold text-foreground text-xs tabular-nums">
+							{(entry.value ?? 0).toLocaleString()}
 						</span>
 					</div>
 				))}

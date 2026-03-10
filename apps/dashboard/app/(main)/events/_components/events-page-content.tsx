@@ -16,7 +16,7 @@ import { useChartPreferences } from "@/hooks/use-chart-preferences";
 import { classifyEventProperties } from "./classify-properties";
 import { EventsList } from "./events-list";
 import { useEventsPageContext } from "./events-page-context";
-import { EventsTrendChart } from "./events-trend-chart";
+import { EVENT_COLORS, EventsTrendChart } from "./events-trend-chart";
 import {
 	formatCompactNumber,
 	formatDateLabel,
@@ -165,6 +165,14 @@ export function EventsPageContent() {
 		return { data, eventNames };
 	}, [trendsByEventData, dateRange.granularity, allDates]);
 
+	const eventColorMap = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const [idx, name] of perEventChartData.eventNames.entries()) {
+			map.set(name, EVENT_COLORS[idx % EVENT_COLORS.length] ?? "#888");
+		}
+		return map;
+	}, [perEventChartData.eventNames]);
+
 	const todayDate = dayjs().format("YYYY-MM-DD");
 	const todayEvent = trendsData.find(
 		(event) => dayjs(event.date).format("YYYY-MM-DD") === todayDate
@@ -291,6 +299,7 @@ export function EventsPageContent() {
 					/>
 
 					<EventsList
+						eventColorMap={eventColorMap}
 						events={eventsListData}
 						isFetching={isFetching}
 						isLoading={isPageLoading}

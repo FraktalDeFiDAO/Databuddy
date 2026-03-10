@@ -25,10 +25,13 @@ export function EventsChartTooltip({
 	}
 
 	return (
-		<div className="rounded border bg-popover px-3 py-2 shadow-md">
-			<p className="mb-1 font-medium text-popover-foreground text-xs">
-				{label}
-			</p>
+		<div className="min-w-[160px] rounded border bg-popover p-2.5 shadow-lg">
+			{label && (
+				<div className="mb-2 flex items-center gap-2 border-b pb-2">
+					<div className="size-1.5 animate-pulse rounded-full bg-primary" />
+					<p className="font-medium text-foreground text-xs">{label}</p>
+				</div>
+			)}
 			<div className="space-y-1">
 				{payload.map((entry) => {
 					const color =
@@ -38,7 +41,7 @@ export function EventsChartTooltip({
 
 					return (
 						<div
-							className="flex items-center justify-between gap-4"
+							className="flex items-center justify-between gap-3"
 							key={entry.dataKey}
 						>
 							<div className="flex items-center gap-1.5">
@@ -50,7 +53,7 @@ export function EventsChartTooltip({
 									{entry.name}
 								</span>
 							</div>
-							<span className="font-medium text-popover-foreground text-xs tabular-nums">
+							<span className="font-semibold text-foreground text-xs tabular-nums">
 								{entry.value.toLocaleString()}
 							</span>
 						</div>
