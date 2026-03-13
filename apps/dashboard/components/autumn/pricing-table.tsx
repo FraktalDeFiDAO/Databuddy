@@ -17,19 +17,15 @@ import {
 	RocketLaunchIcon,
 	SparkleIcon,
 	StarIcon,
-	WarningIcon,
 } from "@phosphor-icons/react";
-import type { Product, ProductItem } from "autumn-js";
-import {
-	type ProductDetails,
-	useCustomer,
-	usePricingTable,
-} from "autumn-js/react";
+import type { PlanDisplay } from "@/components/providers/billing-provider";
+
+type PlanItem = PlanDisplay["items"][number];
+
+import { useCustomer } from "autumn-js/react";
 import { createContext, useContext, useState } from "react";
 import { PricingTiersTooltip } from "@/app/(main)/billing/components/pricing-tiers-tooltip";
-import { getStripeMetadata } from "@/app/(main)/billing/utils/stripe-metadata";
-import AttachDialog from "@/components/autumn/attach-dialog";
-import { EmptyState } from "@/components/empty-state";
+import { useBillingContext } from "@/components/providers/billing-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,7 +36,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
+import { getPlanButtonContent } from "@/lib/autumn/pricing-table-content";
 import { cn } from "@/lib/utils";
 
 const PLAN_ICONS: Record<string, typeof CrownIcon> = {
@@ -161,25 +157,29 @@ function PricingTableSkeleton() {
 }
 
 const PricingTableContext = createContext<{
-	products: Product[];
+	plans: PlanDisplay[];
 	selectedPlan?: string | null;
-}>({ products: [], selectedPlan: null });
+	currentPlanId: PlanId | null;
+	hasActiveSubscription: boolean;
+}>({
+	plans: [],
+	selectedPlan: null,
+	currentPlanId: null,
+	hasActiveSubscription: false,
+});
 
 function usePricingTableCtx() {
 	return useContext(PricingTableContext);
 }
 
 export default function PricingTable({
-	productDetails,
 	selectedPlan,
 }: {
-	productDetails?: ProductDetails[];
 	selectedPlan?: string | null;
 }) {
 	const { attach } = useCustomer();
-	const { products, isLoading, error } = usePricingTable({
-		productDetails,
-	});
+	const { plans, isLoading, currentPlanId, hasActiveSubscription } =
+		useBillingContext();
 
 	if (isLoading) {
 		return (
@@ -192,39 +192,31 @@ export default function PricingTable({
 		);
 	}
 
-	if (error) {
-		return (
-			<EmptyState
-				className="flex h-full flex-col items-center justify-center"
-				description="Something went wrong while loading pricing plans"
-				icon={<WarningIcon />}
-				title="Failed to load pricing plans"
-				variant="error"
-			/>
-		);
-	}
-
-	const filteredProducts =
-		products?.filter((p) => ["hobby", "pro", "scale"].includes(p.id)) ?? [];
+	const filteredPlans =
+		plans?.filter((p) => ["hobby", "pro", "scale"].includes(p.id)) ?? [];
 
 	return (
 		<PricingTableContext.Provider
-			value={{ products: products ?? [], selectedPlan }}
+			value={{
+				plans: plans ?? [],
+				selectedPlan,
+				currentPlanId: currentPlanId ?? null,
+				hasActiveSubscription: hasActiveSubscription ?? false,
+			}}
 		>
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{filteredProducts.map((plan) => (
+				{filteredPlans.map((plan) => (
 					<PricingCard
 						attachAction={async () => {
 							await attach({
-								productId: plan.id,
-								dialog: AttachDialog,
-								metadata: getStripeMetadata(),
+								planId: plan.id,
+								successUrl: `${window.location.origin}/billing`,
 								...(plan.id === "hobby" && { reward: "SAVE80" }),
 							});
 						}}
 						isSelected={selectedPlan === plan.id}
 						key={plan.id}
-						productId={plan.id}
+						planId={plan.id}
 					/>
 				))}
 			</div>
@@ -297,43 +289,83 @@ function DowngradeConfirmDialog({
 	);
 }
 
+const TIER_ORDER: PlanId[] = [
+	PLAN_IDS.FREE,
+	PLAN_IDS.HOBBY,
+	PLAN_IDS.PRO,
+	PLAN_IDS.SCALE,
+];
+
+function getPlanScenario(
+	planId: string,
+	currentPlanId: PlanId | null,
+	hasActiveSubscription: boolean
+): "active" | "scheduled" | "upgrade" | "downgrade" | "new" {
+	if (!currentPlanId || currentPlanId === PLAN_IDS.FREE) {
+		return hasActiveSubscription && currentPlanId === planId ? "active" : "new";
+	}
+	if (currentPlanId === planId) {
+		return "active";
+	}
+	const currentIdx = TIER_ORDER.indexOf(currentPlanId);
+	const planIdx = TIER_ORDER.indexOf(planId as PlanId);
+	if (planIdx > currentIdx) {
+		return "upgrade";
+	}
+	if (planIdx < currentIdx && planIdx >= 0) {
+		return "downgrade";
+	}
+	return "new";
+}
+
 function PricingCard({
-	productId,
+	planId,
 	className,
 	attachAction,
 	isSelected = false,
 }: {
-	productId: string;
+	planId: string;
 	className?: string;
 	attachAction?: () => Promise<void>;
 	isSelected?: boolean;
 }) {
-	const { products, selectedPlan } = usePricingTableCtx();
+	const { plans, selectedPlan, currentPlanId, hasActiveSubscription } =
+		usePricingTableCtx();
 	const { attach } = useCustomer();
 	const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
 	const [isAttaching, setIsAttaching] = useState(false);
-	const product = products.find((p) => p.id === productId);
+	const plan = plans.find((p) => p.id === planId);
 
-	if (!product) {
+	if (!plan) {
 		return null;
 	}
 
-	const { name, display: productDisplay } = product;
-	const { buttonText: defaultButtonText } = getPricingTableContent(product);
-	const isRecommended = !!productDisplay?.recommend_text;
-	const Icon = getPlanIcon(product.id);
-	const isDowngrade = product.scenario === "downgrade";
-	const isDisabled =
-		product.scenario === "active" || product.scenario === "scheduled";
-
-	const currentProduct = products.find(
-		(p) => p.scenario === "active" || p.scenario === "scheduled"
+	const scenario = getPlanScenario(
+		plan.id,
+		currentPlanId,
+		hasActiveSubscription
 	);
-	const currentProductName =
-		currentProduct?.display?.name || currentProduct?.name;
+	const { buttonText: defaultButtonText } = getPlanButtonContent(
+		plan,
+		currentPlanId,
+		hasActiveSubscription
+	);
+	const isRecommended = plan.id === "pro";
+	const Icon = getPlanIcon(plan.id);
+	const isDowngrade = scenario === "downgrade";
+	const isDisabled = scenario === "active" || scenario === "scheduled";
+
+	const currentPlan = plans.find(
+		(p) =>
+			getPlanScenario(p.id, currentPlanId, hasActiveSubscription) ===
+				"active" ||
+			getPlanScenario(p.id, currentPlanId, hasActiveSubscription) ===
+				"scheduled"
+	);
+	const currentPlanName = currentPlan?.name ?? "";
 
 	const buttonText =
-		selectedPlan === productId ? (
+		selectedPlan === planId ? (
 			<span className="font-semibold">Complete Purchase →</span>
 		) : (
 			defaultButtonText
@@ -354,9 +386,12 @@ function PricingCard({
 		setIsAttaching(false);
 	};
 
-	const mainPrice = product.properties?.is_free
-		? { primary_text: "Free", secondary_text: "forever" }
-		: product.items[0]?.display;
+	const mainPrice = plan.price
+		? {
+				primary_text: `$${plan.price.amount}/${plan.price.interval}`,
+				secondary_text: "",
+			}
+		: { primary_text: "Free", secondary_text: "forever" };
 
 	const supportLevels: Record<string, string> = {
 		free: "Community Support",
@@ -366,26 +401,34 @@ function PricingCard({
 		buddy: "Priority Email + Slack Support",
 	};
 
-	const extraFeatures = ["scale", "buddy"].includes(product.id)
+	const extraFeatures = ["scale", "buddy"].includes(plan.id)
 		? [
-				{ display: { primary_text: "White Glove Onboarding" } },
-				{ display: { primary_text: "Beta/Early Access" } },
+				{ primaryText: "White Glove Onboarding" },
+				{ primaryText: "Beta/Early Access" },
 			]
 		: [];
 
-	const supportItem = supportLevels[product.id]
-		? { display: { primary_text: supportLevels[product.id] } }
+	const supportItem = supportLevels[plan.id]
+		? { primaryText: supportLevels[plan.id] }
 		: null;
 
-	// Autumn billing features (usage limits, etc.)
 	const billingItems = [
-		...(product.properties?.is_free ? product.items : product.items.slice(1)),
+		...(plan.price ? plan.items : plan.items),
 		...extraFeatures,
 		...(supportItem ? [supportItem] : []),
 	];
 
-	// Gated features new to this plan
-	const newGatedFeatures = getNewFeaturesForPlan(product.id);
+	const newGatedFeatures = getNewFeaturesForPlan(plan.id);
+
+	function getItemKey(
+		item: PlanItem | { primaryText: string },
+		idx: number
+	): string {
+		if ("featureId" in item) {
+			return item.featureId;
+		}
+		return `extra-${idx}-${item.primaryText}`;
+	}
 
 	return (
 		<div
@@ -399,7 +442,7 @@ function PricingCard({
 			{isRecommended && (
 				<Badge className="absolute top-3 right-3 bg-primary text-primary-foreground">
 					<StarIcon className="mr-1" size={12} weight="fill" />
-					{productDisplay?.recommend_text}
+					Recommended
 				</Badge>
 			)}
 
@@ -409,25 +452,23 @@ function PricingCard({
 				</div>
 				<div className="min-w-0 flex-1">
 					<div className="flex items-center gap-2">
-						<h3 className="truncate font-semibold">
-							{productDisplay?.name || name}
-						</h3>
+						<h3 className="truncate font-semibold">{plan.name}</h3>
 						{isSelected && (
 							<Badge className="shrink-0" variant="secondary">
 								Selected
 							</Badge>
 						)}
 					</div>
-					{productDisplay?.description && (
+					{plan.description && (
 						<p className="truncate text-muted-foreground text-sm">
-							{productDisplay.description}
+							{plan.description}
 						</p>
 					)}
 				</div>
 			</div>
 
 			<div className="dotted-bg border-y bg-accent px-5 py-4">
-				{product.id === "hobby" ? (
+				{plan.id === "hobby" ? (
 					<div className="flex flex-col gap-1">
 						<div className="flex items-baseline gap-1">
 							<span className="font-semibold text-2xl">$2</span>
@@ -452,16 +493,10 @@ function PricingCard({
 			</div>
 
 			<div className="flex-1 p-5">
-				{product.display?.everything_from && (
-					<p className="mb-3 text-muted-foreground text-sm">
-						Everything from {product.display.everything_from}, plus:
-					</p>
-				)}
-
 				{/* Billing features (usage limits) */}
 				<div className="space-y-2.5">
-					{billingItems.map((item) => (
-						<FeatureItem item={item} key={item.display?.primary_text} />
+					{billingItems.map((item, idx) => (
+						<FeatureItem item={item} key={getItemKey(item, idx)} />
 					))}
 				</div>
 
@@ -503,7 +538,7 @@ function PricingCard({
 			</div>
 
 			<DowngradeConfirmDialog
-				currentProductName={currentProductName}
+				currentProductName={currentPlanName}
 				isOpen={showDowngradeDialog}
 				onClose={() => setShowDowngradeDialog(false)}
 				onConfirm={async () => {
@@ -511,35 +546,51 @@ function PricingCard({
 					setIsAttaching(true);
 					try {
 						await attach({
-							productId: product.id,
-							dialog: AttachDialog,
-							metadata: getStripeMetadata(),
-							...(product.id === "hobby" && { reward: "SAVE80" }),
+							planId: plan.id,
+							successUrl: `${window.location.origin}/billing`,
+							...(plan.id === "hobby" && { reward: "SAVE80" }),
 						});
 					} catch {
 						// Error handled by attach
 					}
 					setIsAttaching(false);
 				}}
-				productName={productDisplay?.name || name}
+				productName={plan.name}
 			/>
 		</div>
 	);
 }
 
-function FeatureItem({ item }: { item: ProductItem }) {
-	const featureItem = item as ProductItem & {
+type BillingItem = PlanItem | { primaryText: string };
+
+function FeatureItem({ item }: { item: BillingItem }) {
+	if ("primaryText" in item) {
+		return (
+			<div className="flex items-start gap-2 text-sm">
+				<CheckIcon
+					className="mt-0.5 size-4 shrink-0 text-accent-foreground"
+					weight="bold"
+				/>
+				<span>{item.primaryText}</span>
+			</div>
+		);
+	}
+
+	const meta = FEATURE_METADATA[item.featureId as GatedFeatureId];
+	const primaryText = meta?.name ?? item.featureId;
+	const planItem = item as PlanItem & {
 		tiers?: { to: number | "inf"; amount: number }[];
 	};
-	const hasTiers = featureItem.tiers && featureItem.tiers.length > 0;
-
-	let secondaryText = featureItem.display?.secondary_text;
-	if (hasTiers && featureItem.tiers) {
-		const firstPaidTier = featureItem.tiers.find((t) => t.amount > 0);
-		secondaryText = firstPaidTier
-			? `then $${firstPaidTier.amount.toFixed(6)}/event`
-			: "Included";
-	}
+	const hasTiers = planItem.tiers && planItem.tiers.length > 0;
+	const firstPaidTier =
+		hasTiers && planItem.tiers
+			? planItem.tiers.find((t: { amount: number }) => t.amount > 0)
+			: undefined;
+	const secondaryText = firstPaidTier
+		? `then $${firstPaidTier.amount.toFixed(6)}/event`
+		: hasTiers && planItem.tiers
+			? "Included"
+			: null;
 
 	return (
 		<div className="flex items-start gap-2 text-sm">
@@ -548,14 +599,14 @@ function FeatureItem({ item }: { item: ProductItem }) {
 				weight="bold"
 			/>
 			<div className="flex flex-col">
-				<span>{featureItem.display?.primary_text}</span>
+				<span>{primaryText}</span>
 				{secondaryText && (
 					<div className="flex items-center gap-1">
 						<span className="text-muted-foreground text-xs">
 							{secondaryText}
 						</span>
-						{hasTiers && featureItem.tiers && (
-							<PricingTiersTooltip showText={false} tiers={featureItem.tiers} />
+						{hasTiers && planItem.tiers && (
+							<PricingTiersTooltip showText={false} tiers={planItem.tiers} />
 						)}
 					</div>
 				)}

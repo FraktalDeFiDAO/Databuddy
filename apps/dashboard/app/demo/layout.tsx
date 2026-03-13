@@ -38,6 +38,8 @@ export default function DemoLayout({
 	return (
 		<AutumnProvider
 			backendUrl={process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}
+			includeCredentials={true}
+			pathPrefix="/api/autumn"
 		>
 			<BillingProvider>
 				<DemoLayoutContent>{children}</DemoLayoutContent>

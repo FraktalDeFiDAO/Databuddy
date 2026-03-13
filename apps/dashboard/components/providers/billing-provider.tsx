@@ -15,11 +15,28 @@ import {
 	type PlanId,
 } from "@databuddy/shared/types/features";
 import { useQuery } from "@tanstack/react-query";
-import type { Customer, CustomerFeature, Product } from "autumn-js";
-import { useCustomer, usePricingTable } from "autumn-js/react";
+import { useCustomer, useListPlans } from "autumn-js/react";
 import { useParams, usePathname } from "next/navigation";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { orpc } from "@/lib/orpc";
+
+export interface PlanDisplay {
+	id: string;
+	name: string;
+	description?: string | null;
+	price?: { amount: number; interval: string } | null;
+	items: Array<{ featureId: string }>;
+	addOn?: boolean;
+	freeTrial?: unknown;
+}
+
+export interface BillingCustomer {
+	id?: string | null;
+	balances?: Record<
+		string,
+		{ remaining?: number; granted?: number; unlimited?: boolean }
+	>;
+}
 
 export interface FeatureAccess {
 	allowed: boolean;
@@ -36,8 +53,8 @@ export interface GatedFeatureAccess {
 }
 
 export interface BillingContextValue {
-	customer: Customer | null;
-	products: Product[];
+	customer: BillingCustomer | null;
+	plans: PlanDisplay[];
 	isLoading: boolean;
 	hasActiveSubscription: boolean;
 	currentPlanId: PlanId | null;
@@ -49,7 +66,9 @@ export interface BillingContextValue {
 	// Usage-based features
 	canUse: (featureId: FeatureId | string) => boolean;
 	getUsage: (featureId: FeatureId | string) => FeatureAccess;
-	getFeature: (featureId: FeatureId | string) => CustomerFeature | null;
+	getFeature: (
+		featureId: FeatureId | string
+	) => { remaining?: number; granted?: number; unlimited?: boolean } | null;
 	// Gated features
 	isFeatureEnabled: (feature: GatedFeatureId) => boolean;
 	getGatedFeatureAccess: (feature: GatedFeatureId) => GatedFeatureAccess;
@@ -99,16 +118,16 @@ export function BillingProvider({
 	}, [propWebsiteId, params?.id, isDemoRoute, isWebsiteRoute]);
 
 	const {
-		customer,
+		data: customer,
 		isLoading: isCustomerLoading,
 		refetch: refetchCustomer,
 	} = useCustomer();
 
 	const {
-		products,
-		isLoading: isProductsLoading,
-		refetch: refetchProducts,
-	} = usePricingTable();
+		data: plans = [],
+		isLoading: isPlansLoading,
+		refetch: refetchPlans,
+	} = useListPlans();
 
 	// Get the correct billing context (handles org/website ownership)
 	// Always fetch billing context - the backend handles both:
@@ -127,35 +146,36 @@ export function BillingProvider({
 	});
 
 	const value = useMemo<BillingContextValue>(() => {
-		// Use the billing context from backend which correctly handles org ownership
 		const effectivePlanId = (billingContext?.planId ?? PLAN_IDS.FREE) as PlanId;
-		const isOrganizationBilling = billingContext?.isOrganization ?? false;
-		const canUserUpgrade = billingContext?.canUserUpgrade ?? true;
+		const isOrganizationBilling = Boolean(billingContext?.isOrganization);
+		const canUserUpgrade = Boolean(billingContext?.canUserUpgrade ?? true);
 
 		const currentPlanId = effectivePlanId;
-		const currentPlan = products?.find((p) => p.id === currentPlanId);
+		const currentPlan = plans?.find((p) => p.id === currentPlanId);
 		const isFree =
 			currentPlanId === PLAN_IDS.FREE ||
-			currentPlan?.properties?.is_free === true ||
+			currentPlan?.price === null ||
 			!billingContext?.hasActiveSubscription;
 
-		const getFeature = (id: FeatureId | string): CustomerFeature | null =>
-			customer?.features?.[id] ?? null;
+		const getFeature = (
+			id: FeatureId | string
+		): { remaining?: number; granted?: number; unlimited?: boolean } | null =>
+			customer?.balances?.[id] ?? null;
 
 		const canUse = (id: FeatureId | string): boolean => {
-			const feature = customer?.features?.[id];
-			if (!feature) {
+			const balance = customer?.balances?.[id];
+			if (!balance) {
 				return false;
 			}
-			if (feature.unlimited) {
+			if (balance.unlimited) {
 				return true;
 			}
-			return (feature.balance ?? 0) > 0;
+			return (balance.remaining ?? 0) > 0;
 		};
 
 		const getUsage = (id: FeatureId | string): FeatureAccess => {
-			const feature = customer?.features?.[id];
-			if (!feature) {
+			const balance = customer?.balances?.[id];
+			if (!balance) {
 				return {
 					allowed: false,
 					balance: 0,
@@ -165,17 +185,17 @@ export function BillingProvider({
 				};
 			}
 
-			const balance = feature.balance ?? 0;
-			const limit = feature.included_usage ?? 0;
-			const unlimited = feature.unlimited ?? false;
+			const remaining = balance.remaining ?? 0;
+			const limit = balance.granted ?? 0;
+			const unlimited = balance.unlimited ?? false;
 			const usagePercent =
 				!unlimited && limit > 0
-					? Math.round(((limit - balance) / limit) * 100)
+					? Math.round(((limit - remaining) / limit) * 100)
 					: null;
 
 			return {
-				allowed: unlimited || balance > 0,
-				balance,
+				allowed: unlimited || remaining > 0,
+				balance: remaining,
 				limit,
 				unlimited,
 				usagePercent,
@@ -213,17 +233,16 @@ export function BillingProvider({
 		const refetch = () => {
 			refetchCustomer();
 			refetchBillingContext();
-			if (typeof refetchProducts === "function") {
-				refetchProducts();
+			if (typeof refetchPlans === "function") {
+				refetchPlans();
 			}
 		};
 
 		return {
 			customer: customer ?? null,
-			products: products ?? [],
-			isLoading:
-				isCustomerLoading || isProductsLoading || isBillingContextLoading,
-			hasActiveSubscription: billingContext?.hasActiveSubscription ?? false,
+			plans: plans ?? [],
+			isLoading: isCustomerLoading || isPlansLoading || isBillingContextLoading,
+			hasActiveSubscription: Boolean(billingContext?.hasActiveSubscription),
 			currentPlanId,
 			isFree,
 			isOrganizationBilling,
@@ -240,14 +259,14 @@ export function BillingProvider({
 		};
 	}, [
 		customer,
-		products,
+		plans,
 		billingContext,
 		isCustomerLoading,
-		isProductsLoading,
+		isPlansLoading,
 		isBillingContextLoading,
 		refetchCustomer,
 		refetchBillingContext,
-		refetchProducts,
+		refetchPlans,
 	]);
 
 	return (

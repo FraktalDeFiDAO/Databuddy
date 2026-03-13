@@ -16,7 +16,7 @@ import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { autumnHandler } from "autumn-js/elysia";
+import { autumnHandler } from "autumn-js/next";
 import { Elysia } from "elysia";
 import {
 	endRequestSpan,
@@ -282,7 +282,7 @@ const app = new Elysia()
 						headers: request.headers,
 					});
 
-					if (!session?.user) {
+					if (!session?.user?.id) {
 						return null;
 					}
 
@@ -297,8 +297,8 @@ const app = new Elysia()
 					return {
 						customerId,
 						customerData: {
-							name: session.user.name,
-							email: session.user.email,
+							name: session.user.name ?? undefined,
+							email: session.user.email ?? undefined,
 						},
 					};
 				} catch (error) {
@@ -306,6 +306,7 @@ const app = new Elysia()
 					return null;
 				}
 			},
+			pathPrefix: "/api/autumn",
 		})
 	)
 	.use(query)

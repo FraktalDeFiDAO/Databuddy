@@ -2,7 +2,7 @@ import { getApiKeyFromHeader } from "@databuddy/api-keys/resolve";
 import { auth, type User } from "@databuddy/auth";
 import { and, db, eq, member } from "@databuddy/db";
 import { os as createOS, ORPCError } from "@orpc/server";
-import { Autumn as autumn } from "autumn-js";
+import { Autumn } from "autumn-js";
 import { baseErrors } from "./errors";
 import {
 	enrichSpanWithContext,
@@ -66,15 +66,19 @@ async function getBillingOwnerId(
 	// Get the plan from Autumn
 	let planId = "free";
 	try {
-		const customerResult = await autumn.customers.get(customerId);
-		const customer = customerResult.data;
+		const autumn = new Autumn({
+			secretKey: process.env.AUTUMN_SECRET_KEY,
+		});
+		const customer = await autumn.customers.getOrCreate({
+			customerId,
+		});
 
 		if (customer) {
-			const activeProduct = customer.products?.find(
-				(p) => p.status === "active"
+			const activeSubscription = customer.subscriptions?.find(
+				(s) => s.status === "active"
 			);
-			if (activeProduct?.id) {
-				planId = String(activeProduct.id).toLowerCase();
+			if (activeSubscription?.planId) {
+				planId = String(activeSubscription.planId).toLowerCase();
 			}
 		}
 	} catch {

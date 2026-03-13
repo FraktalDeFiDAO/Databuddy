@@ -1,4 +1,4 @@
-import type { CustomerFeature } from "autumn-js";
+import type { Balance } from "autumn-js";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
@@ -56,23 +56,22 @@ function calculateOverageCost(
 	return totalCost;
 }
 
-export function calculateFeatureUsage(
-	feature: CustomerFeature,
+export function balanceToFeatureUsage(
+	balance: Balance,
 	planLimit?: number,
 	pricingTiers?: PricingTier[]
 ): FeatureUsage {
-	const balance = feature.balance ?? 0;
-	const limit = planLimit ?? feature.included_usage ?? 0;
+	const remaining = balance.remaining;
+	const limit = planLimit ?? balance.granted;
 
 	const unlimited =
-		feature.unlimited ||
-		!Number.isFinite(balance) ||
-		balance === Number.POSITIVE_INFINITY;
+		balance.unlimited ||
+		!Number.isFinite(remaining) ||
+		remaining === Number.POSITIVE_INFINITY;
 
-	const hasExtraCredits = !unlimited && balance > limit;
+	const hasExtraCredits = !unlimited && remaining > limit;
 
-	// Overage when balance is negative
-	const overageAmount = balance < 0 ? Math.abs(balance) : 0;
+	const overageAmount = remaining < 0 ? Math.abs(remaining) : 0;
 	const overage =
 		overageAmount > 0
 			? {
@@ -84,21 +83,24 @@ export function calculateFeatureUsage(
 	const effectiveLimit = unlimited
 		? Number.POSITIVE_INFINITY
 		: hasExtraCredits
-			? balance
+			? remaining
 			: limit;
 
+	const interval =
+		balance.breakdown?.at(0)?.reset?.interval?.toString() ?? null;
+
 	return {
-		id: feature.id,
-		name: feature.name,
-		balance,
+		id: balance.featureId,
+		name: balance.feature?.name ?? balance.featureId,
+		balance: remaining,
 		limit: effectiveLimit,
 		includedLimit: unlimited ? Number.POSITIVE_INFINITY : limit,
 		unlimited,
 		hasExtraCredits,
 		hasPricedOverage: Boolean(pricingTiers?.length),
 		pricingTiers: pricingTiers ?? [],
-		interval: feature.interval ?? null,
-		resetAt: feature.next_reset_at ?? null,
+		interval,
+		resetAt: balance.nextResetAt,
 		overage,
 	};
 }

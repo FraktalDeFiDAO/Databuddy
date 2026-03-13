@@ -12,7 +12,7 @@ import {
 import { logger } from "@databuddy/shared/logger";
 import { getPendingInvitationsSchema } from "@databuddy/validation";
 import { ORPCError } from "@orpc/server";
-import { Autumn as autumn } from "autumn-js";
+import { Autumn } from "autumn-js";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure } from "../orpc";
 import { authorizeWebsiteAccess, checkOrgPermission } from "../utils/auth";
@@ -288,24 +288,27 @@ export const organizationsRouter = {
 				await getBillingOwnerId(context.user.id, activeOrgId);
 
 			try {
-				const checkResult = await autumn.check({
-					customer_id: customerId,
-					feature_id: "events",
+				const autumn = new Autumn({
+					secretKey: process.env.AUTUMN_SECRET_KEY,
 				});
-
-				const data = checkResult.data;
+				const data = await autumn.check({
+					customerId,
+					featureId: "events",
+				});
 
 				if (!data) {
 					throw new ORPCError("INTERNAL_SERVER_ERROR", {
 						message: "Failed to retrieve usage data",
 					});
 				}
-				const used = data.usage ?? 0;
-				const usageLimit = data.usage_limit ?? 0;
-				const unlimited = data.unlimited ?? false;
-				const balance = data.balance ?? 0;
-				const includedUsage = data.included_usage ?? 0;
-				const overageAllowed = data.overage_allowed ?? false;
+				const bal = data.balance;
+				const used = bal?.usage ?? 0;
+				const usageLimit =
+					bal?.granted ?? (bal?.remaining ?? 0) + (bal?.usage ?? 0);
+				const unlimited = bal?.unlimited ?? false;
+				const balance = bal?.remaining ?? 0;
+				const includedUsage = bal?.granted ?? 0;
+				const overageAllowed = bal?.overageAllowed ?? false;
 
 				const remaining = unlimited ? null : Math.max(0, usageLimit - used);
 
@@ -408,8 +411,12 @@ export const organizationsRouter = {
 			}
 
 			try {
-				const customerResult = await autumn.customers.get(customerId);
-				const customer = customerResult.data;
+				const autumn = new Autumn({
+					secretKey: process.env.AUTUMN_SECRET_KEY,
+				});
+				const customer = await autumn.customers.getOrCreate({
+					customerId,
+				});
 
 				if (!customer) {
 					return {
@@ -421,20 +428,20 @@ export const organizationsRouter = {
 					};
 				}
 
-				const activeProduct = customer.products?.find(
-					(p) => p.status === "active"
+				const activeSubscription = customer.subscriptions?.find(
+					(s) => s.status === "active"
 				);
 
-				// Normalize product ID to lowercase for consistency
-				const planId = activeProduct?.id
-					? String(activeProduct.id).toLowerCase()
+				// Normalize plan ID to lowercase for consistency
+				const planId = activeSubscription?.planId
+					? String(activeSubscription.planId).toLowerCase()
 					: "free";
 
 				return {
 					planId,
 					isOrganization,
 					canUserUpgrade,
-					hasActiveSubscription: Boolean(activeProduct),
+					hasActiveSubscription: Boolean(activeSubscription),
 					...debugInfo,
 				};
 			} catch (error) {

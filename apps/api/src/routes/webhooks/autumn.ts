@@ -151,10 +151,11 @@ async function handleThresholdReached(
 		return { success: true, message: "Skipped - unlimited feature" };
 	}
 
-	// Don't send limit emails to paid plan users - they have overage or can upgrade in-app
-	const activeProduct = customer.products?.find((p) => p.status === "active");
-	const planId = activeProduct?.id
-		? String(activeProduct.id).toLowerCase()
+	const activeSubscription = customer.products?.find(
+		(s) => s.status === "active"
+	);
+	const planId = activeSubscription?.id
+		? String(activeSubscription.id).toLowerCase()
 		: "free";
 	if (planId !== "free") {
 		logger.info(

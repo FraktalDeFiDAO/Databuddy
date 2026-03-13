@@ -24,6 +24,8 @@ export default async function MainLayout({
 	return (
 		<AutumnProvider
 			backendUrl={process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}
+			includeCredentials
+			pathPrefix="/api/autumn"
 		>
 			<BillingProvider>
 				<div className="h-dvh overflow-hidden text-foreground">

@@ -9,12 +9,10 @@ import {
 	TrendUpIcon,
 	XIcon,
 } from "@phosphor-icons/react";
-import type { CustomerProduct, Product } from "autumn-js";
-import { useCustomer } from "autumn-js/react";
+import type { Plan, Subscription } from "autumn-js";
 import dayjs from "dayjs";
 import Link from "next/link";
 import { useMemo } from "react";
-import AttachDialog from "@/components/autumn/attach-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useBillingContext } from "@/components/providers/billing-provider";
 import { Badge } from "@/components/ui/badge";
@@ -26,43 +24,40 @@ import { OverviewSkeleton } from "./components/overview-skeleton";
 import { UsageRow } from "./components/usage-row";
 import { useBilling, useBillingData } from "./hooks/use-billing";
 
-type AddOnProduct = Product & { is_add_on?: boolean };
+type AddOnPlan = Plan & { is_add_on?: boolean };
 
-function isSSOProduct(product: Product): boolean {
-	const id = product.id.toLowerCase();
+function isSSOPlan(plan: Plan): boolean {
+	const id = plan.id.toLowerCase();
 	if (id === "sso" || id.includes("sso")) {
 		return true;
 	}
-	const name = product.name.toLowerCase();
+	const name = plan.name.toLowerCase();
 	if (name.includes("single sign-on")) {
 		return true;
 	}
-	const displayName = product.display?.name?.toLowerCase() ?? "";
+	const displayName = plan.display?.name?.toLowerCase() ?? "";
 	return displayName.includes("single sign-on");
 }
 
-function getAddOnStatus(addOn: Product, customerProduct?: CustomerProduct) {
+function getAddOnStatus(plan: Plan, subscription?: Subscription) {
 	const isCancelled =
-		customerProduct?.canceled_at &&
-		customerProduct?.current_period_end &&
-		dayjs(customerProduct.current_period_end).isAfter(dayjs());
+		subscription?.canceledAt &&
+		subscription?.currentPeriodEnd &&
+		dayjs(subscription.currentPeriodEnd).isAfter(dayjs());
 
 	const isActive =
 		!isCancelled &&
-		(addOn.scenario === "active" ||
-			addOn.scenario === "scheduled" ||
-			customerProduct?.status === "active" ||
-			customerProduct?.status === "scheduled");
+		(subscription?.status === "active" || subscription?.status === "scheduled");
 
 	return { isCancelled, isActive };
 }
 
 export default function BillingPage() {
 	const { canUserUpgrade } = useBillingContext();
-	const { products, usage, customer, isLoading, error, refetch } =
+	const { plans, usage, customer, isLoading, error, refetch } =
 		useBillingData();
-	const { attach } = useCustomer();
 	const {
+		onAttachAddOn,
 		onCancelClick,
 		onCancelConfirm,
 		onCancelDialogClose,
@@ -73,45 +68,37 @@ export default function BillingPage() {
 	} = useBilling(refetch);
 
 	const addOns = useMemo(() => {
-		const allAddOns =
-			products?.filter((p) => (p as AddOnProduct).is_add_on) ?? [];
-		return allAddOns.filter((p) => !isSSOProduct(p));
-	}, [products]);
+		const allAddOns = plans?.filter((p) => (p as AddOnPlan).is_add_on) ?? [];
+		return allAddOns.filter((p) => !isSSOPlan(p));
+	}, [plans]);
 
-	const { currentPlan, currentProduct, usageStats, statusDetails } =
+	const { currentPlan, currentSubscription, usageStats, statusDetails } =
 		useMemo(() => {
-			const activeCustomerProduct = customer?.products?.find((p) => {
-				if (p.canceled_at && p.current_period_end) {
-					return dayjs(p.current_period_end).isAfter(dayjs());
+			const activeSubscription = customer?.subscriptions?.find((s) => {
+				if (s.canceledAt && s.currentPeriodEnd) {
+					return dayjs(s.currentPeriodEnd).isAfter(dayjs());
 				}
-				return !p.canceled_at || p.status === "scheduled";
+				return !s.canceledAt || s.status === "scheduled";
 			});
 
-			const activePlan = activeCustomerProduct
-				? products?.find((p) => p.id === activeCustomerProduct.id)
-				: products?.find(
-						(p) =>
-							!(p.scenario && ["upgrade", "downgrade"].includes(p.scenario))
-					);
+			const activePlan = activeSubscription
+				? plans?.find((p) => p.id === activeSubscription.planId)
+				: plans?.find((p) => p.id !== "free" && !p.properties?.is_free);
 
-			const planStatusDetails = activeCustomerProduct
-				? getSubscriptionStatusDetails(
-						activeCustomerProduct as Parameters<
-							typeof getSubscriptionStatusDetails
-						>[0]
-					)
+			const planStatusDetails = activeSubscription
+				? getSubscriptionStatusDetails(activeSubscription)
 				: "";
 
 			return {
 				currentPlan: activePlan,
-				currentProduct: activeCustomerProduct,
+				currentSubscription: activeSubscription,
 				usageStats: usage?.features ?? [],
 				statusDetails: planStatusDetails,
 			};
 		}, [
-			products,
+			plans,
 			usage?.features,
-			customer?.products,
+			customer?.subscriptions,
 			getSubscriptionStatusDetails,
 		]);
 

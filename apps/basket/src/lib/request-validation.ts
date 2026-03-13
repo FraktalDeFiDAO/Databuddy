@@ -14,7 +14,7 @@ import {
 	VALIDATION_LIMITS,
 	validatePayloadSize,
 } from "@utils/validation";
-import { Autumn as autumn } from "autumn-js";
+import { Autumn } from "autumn-js";
 
 interface ValidationResult {
 	success: boolean;
@@ -167,12 +167,14 @@ export function validateRequest(
 
 		if (website.ownerId) {
 			try {
-				const result = await record("autumn.check", () =>
+				const autumn = new Autumn({
+					secretKey: process.env.AUTUMN_SECRET_KEY,
+				});
+				const data = await record("autumn.check", () =>
 					autumn.check({
-						customer_id: website.ownerId || "",
-						feature_id: "events",
-						send_event: true,
-						// @ts-expect-error autumn types are not up to date
+						customerId: website.ownerId || "",
+						featureId: "events",
+						sendEvent: true,
 						properties: {
 							website_domain: website.domain,
 							website_id: website.id,
@@ -180,16 +182,17 @@ export function validateRequest(
 						},
 					})
 				);
-				const data = result.data;
 
 				if (data) {
-					const usage = data.usage ?? 0;
-					const usageLimit = data.usage_limit ?? data.included_usage ?? 0;
-					const isUnlimited = data.unlimited ?? false;
+					const balance = data.balance;
+					const usage = balance?.usage ?? 0;
+					const usageLimit =
+						balance?.granted ??
+						(balance?.remaining ?? 0) + (balance?.usage ?? 0);
+					const isUnlimited = balance?.unlimited ?? false;
 					const usageExceeds150Percent =
 						!isUnlimited && usageLimit > 0 && usage >= usageLimit * 1.5;
 
-					// Block only if usage exceeds 1.5x the limit
 					if (usageExceeds150Percent) {
 						logBlockedTraffic(
 							request,
@@ -225,7 +228,7 @@ export function validateRequest(
 
 				setAttributes({
 					autumn_allowed: data?.allowed ?? false,
-					autumn_overage_allowed: data?.overage_allowed ?? false,
+					autumn_overage_allowed: data?.balance?.overageAllowed ?? false,
 				});
 			} catch (error) {
 				captureError(error, {

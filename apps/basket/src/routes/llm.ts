@@ -2,7 +2,7 @@ import { resolveApiKeyOwnerId } from "@hooks/auth";
 import { getApiKeyFromHeader, hasKeyScope } from "@lib/api-key";
 import { insertAICallSpans } from "@lib/event-service";
 import { captureError, record, setAttributes } from "@lib/tracing";
-import { Autumn as autumn } from "autumn-js";
+import { Autumn } from "autumn-js";
 import { Elysia } from "elysia";
 import { z } from "zod";
 
@@ -111,29 +111,30 @@ const app = new Elysia().post("/llm", async (context) => {
 			);
 		}
 
-		// Always run autumn check using the billing owner's user ID
 		try {
-			const result = await record("autumn.check", () =>
+			const autumn = new Autumn({
+				secretKey: process.env.AUTUMN_SECRET_KEY,
+			});
+			const data = await record("autumn.check", () =>
 				autumn.check({
-					customer_id: billingOwnerId,
-					feature_id: "events",
-					send_event: true,
-					// @ts-expect-error autumn types are not up to date
+					customerId: billingOwnerId,
+					featureId: "events",
+					sendEvent: true,
 					properties: {
 						api_key_id: apiKey.id,
 					},
 				})
 			);
-			const data = result.data;
 
 			if (data) {
-				const usage = data.usage ?? 0;
-				const usageLimit = data.usage_limit ?? data.included_usage ?? 0;
-				const isUnlimited = data.unlimited ?? false;
+				const balance = data.balance;
+				const usage = balance?.usage ?? 0;
+				const usageLimit =
+					balance?.granted ?? (balance?.remaining ?? 0) + (balance?.usage ?? 0);
+				const isUnlimited = balance?.unlimited ?? false;
 				const usageExceeds150Percent =
 					!isUnlimited && usageLimit > 0 && usage >= usageLimit * 1.5;
 
-				// Block only if usage exceeds 1.5x the limit
 				if (usageExceeds150Percent) {
 					setAttributes({
 						validation_failed: true,
@@ -158,7 +159,7 @@ const app = new Elysia().post("/llm", async (context) => {
 
 			setAttributes({
 				autumn_allowed: data?.allowed ?? false,
-				autumn_overage_allowed: data?.overage_allowed ?? false,
+				autumn_overage_allowed: data?.balance?.overageAllowed ?? false,
 			});
 		} catch (error) {
 			captureError(error, {
