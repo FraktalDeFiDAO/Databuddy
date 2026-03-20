@@ -8,12 +8,93 @@ import {
 } from "@databuddy/db";
 import type { db as DbType } from "@databuddy/db";
 import { logger } from "@databuddy/shared/logger";
-import { Autumn as autumn } from "autumn-js";
 import { randomUUIDv7 } from "bun";
 import { z } from "zod";
 import { rpcError } from "../errors";
 import { sessionProcedure } from "../orpc";
 import { getBillingCustomerId } from "../utils/billing";
+
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL ?? "";
+const SLACK_TIMEOUT_MS = 10_000;
+
+const CATEGORY_LABELS: Record<string, string> = {
+	bug_report: "Bug Report",
+	feature_request: "Feature Request",
+	ux_improvement: "UX Improvement",
+	performance: "Performance",
+	documentation: "Documentation",
+	other: "Other",
+};
+
+async function notifySlack(
+	title: string,
+	category: string,
+	description: string,
+	userEmail: string
+) {
+	if (!SLACK_WEBHOOK_URL) return;
+
+	const blocks = [
+		{
+			type: "header",
+			text: {
+				type: "plain_text",
+				text: "💬 New Feedback Submitted",
+				emoji: true,
+			},
+		},
+		{
+			type: "section",
+			fields: [
+				{
+					type: "mrkdwn",
+					text: `*Title:*\n${title}`,
+				},
+				{
+					type: "mrkdwn",
+					text: `*Category:*\n${CATEGORY_LABELS[category] ?? category}`,
+				},
+			],
+		},
+		{
+			type: "section",
+			text: {
+				type: "mrkdwn",
+				text: `*Description:*\n${description.slice(0, 500)}${description.length > 500 ? "..." : ""}`,
+			},
+		},
+		{
+			type: "context",
+			elements: [
+				{
+					type: "mrkdwn",
+					text: `Submitted by ${userEmail} · ${new Date().toUTCString()}`,
+				},
+			],
+		},
+	];
+
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS);
+
+	try {
+		await fetch(SLACK_WEBHOOK_URL, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ blocks }),
+			signal: controller.signal,
+		});
+	} catch (error) {
+		if (error instanceof Error && error.name !== "AbortError") {
+			logger.error(
+				{ error: error.message },
+				"Failed to send Slack notification for feedback"
+			);
+		}
+	} finally {
+		clearTimeout(timeoutId);
+	}
+}
 
 const REWARD_TIERS = [
 	{ creditsRequired: 50, rewardType: "events", rewardAmount: 1_000 },
@@ -122,6 +203,13 @@ export const feedbackRouter = {
 					category: input.category,
 				})
 				.returning();
+
+			notifySlack(
+				input.title,
+				input.category,
+				input.description,
+				context.user.email
+			).catch(() => { });
 
 			return newFeedback;
 		}),
@@ -258,26 +346,27 @@ export const feedbackRouter = {
 			);
 
 			try {
-				const checkResult = await autumn.check({
-					customer_id: customerId,
-					feature_id: "events",
-				});
-
-				const currentBalance = checkResult.data?.balance ?? 0;
-				const newBalance = currentBalance + tier.rewardAmount;
-
-				const autumnInstance = new autumn();
-				const updateResult = await autumnInstance.post(
-					`customers/${customerId}/balances`,
+				const response = await fetch(
+					"https://api.useautumn.com/v1/balances.update",
 					{
-						balances: [
-							{ feature_id: "events", balance: newBalance },
-						],
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${process.env.AUTUMN_SECRET_KEY}`,
+						},
+						body: JSON.stringify({
+							customer_id: customerId,
+							feature_id: "events",
+							add_to_balance: tier.rewardAmount,
+						}),
 					}
 				);
 
-				if (updateResult.error) {
-					throw updateResult.error;
+				if (!response.ok) {
+					const body = await response.text();
+					throw new Error(
+						`Autumn API ${response.status}: ${body}`
+					);
 				}
 			} catch (error) {
 				const errorMessage =
