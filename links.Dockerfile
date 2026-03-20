@@ -3,6 +3,7 @@ FROM oven/bun:1.3.6 AS build
 WORKDIR /app
 
 COPY package.json package.json
+COPY bun.lock bun.lock
 COPY apps/links/package.json ./apps/links/package.json
 COPY packages/*/package.json ./packages/
 
