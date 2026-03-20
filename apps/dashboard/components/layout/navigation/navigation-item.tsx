@@ -1,8 +1,14 @@
+"use client";
+
 import { ArrowSquareOutIcon, LockSimpleIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { FaviconImage } from "@/components/analytics/favicon-image";
+import {
+	SidebarMenuButton,
+	SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { NavigationItem as NavigationItemType } from "./types";
 
@@ -30,7 +36,6 @@ export function NavigationItem({
 	currentWebsiteId,
 	domain,
 	disabled,
-	sectionName,
 	badge,
 	isLocked = false,
 	lockedPlanName,
@@ -53,117 +58,121 @@ export function NavigationItem({
 		return null;
 	}
 
-	const content = (
-		<>
-			{domain ? (
-				<FaviconImage
-					className="shrink-0 rounded"
-					domain={domain}
-					fallbackIcon={
-						<Icon aria-hidden className="size-5 shrink-0" weight="duotone" />
-					}
-					size={20}
-				/>
-			) : (
+	const iconElement = domain ? (
+		<FaviconImage
+			className="shrink-0 rounded"
+			domain={domain}
+			fallbackIcon={
 				<Icon aria-hidden className="size-4 shrink-0" weight="duotone" />
+			}
+			size={18}
+		/>
+	) : (
+		<Icon aria-hidden className="size-4 shrink-0" weight="duotone" />
+	);
+
+	const trailingContent = (alpha || tag || badge || isExternal) && (
+		<span className="ml-auto flex shrink-0 items-center gap-1">
+			{alpha && (
+				<span className="font-mono text-[10px] text-sidebar-foreground/40 uppercase">
+					Alpha
+				</span>
 			)}
-			<span className="min-w-0 flex-1 truncate">{name}</span>
-		</>
+			{tag && (
+				<span className="font-mono text-[10px] text-sidebar-foreground/40 uppercase">
+					{tag}
+				</span>
+			)}
+			{badge && (
+				<span
+					className={cn(
+						"rounded px-1.5 py-0.5 font-medium text-[10px] leading-none",
+						badge.variant === "purple" &&
+							"bg-accent text-accent-foreground",
+						badge.variant === "blue" &&
+							"bg-accent text-accent-foreground",
+						badge.variant === "green" &&
+							"bg-accent text-accent-foreground",
+						badge.variant === "orange" &&
+							"bg-amber-500/10 text-amber-600 dark:text-amber-500",
+						badge.variant === "red" &&
+							"bg-destructive/10 text-destructive"
+					)}
+				>
+					{badge.text}
+				</span>
+			)}
+			{isExternal && (
+				<ArrowSquareOutIcon
+					aria-hidden
+					className="size-3 text-sidebar-foreground/30"
+					weight="duotone"
+				/>
+			)}
+		</span>
 	);
 
 	if (isLocked) {
 		return (
-			<div
-				aria-disabled
-				className="group flex min-w-0 cursor-not-allowed items-center gap-3 px-4 py-2.5 text-sidebar-foreground/40 text-sm"
-				title={lockedPlanName ? `Requires ${lockedPlanName} plan` : undefined}
-			>
-				{content}
-				<div className="flex shrink-0 items-center gap-1.5">
-					<LockSimpleIcon aria-hidden className="size-3" />
-					{lockedPlanName && (
-						<span className="rounded bg-sidebar-accent px-1.5 py-0.5 font-medium text-[10px] text-sidebar-foreground/50 uppercase">
-							{lockedPlanName}
-						</span>
-					)}
-				</div>
-			</div>
+			<SidebarMenuItem>
+				<SidebarMenuButton
+					className="cursor-not-allowed opacity-40"
+					disabled
+					size="sm"
+					tooltip={
+						lockedPlanName ? `Requires ${lockedPlanName} plan` : undefined
+					}
+				>
+					{iconElement}
+					<span className="truncate">{name}</span>
+					<span className="ml-auto flex shrink-0 items-center gap-1">
+						<LockSimpleIcon aria-hidden className="size-3" />
+						{lockedPlanName && (
+							<span className="font-medium text-[10px] uppercase">
+								{lockedPlanName}
+							</span>
+						)}
+					</span>
+				</SidebarMenuButton>
+			</SidebarMenuItem>
 		);
 	}
 
 	if (disabled) {
 		return (
-			<div
-				aria-disabled
-				className="group flex min-w-0 cursor-not-allowed items-center gap-3 px-4 py-2.5 text-sidebar-foreground/30 text-sm"
-			>
-				{content}
-				{tag && (
-					<span className="shrink-0 font-mono text-sidebar-foreground/30 text-xs uppercase">
-						{tag}
-					</span>
-				)}
-			</div>
+			<SidebarMenuItem>
+				<SidebarMenuButton
+					className="cursor-not-allowed opacity-30"
+					disabled
+					size="sm"
+				>
+					{iconElement}
+					<span className="truncate">{name}</span>
+					{trailingContent}
+				</SidebarMenuButton>
+			</SidebarMenuItem>
 		);
 	}
 
-	const LinkComponent = isExternal ? "a" : Link;
 	const linkProps = isExternal
 		? { href, target: "_blank", rel: "noopener noreferrer" }
 		: { href: fullPath, prefetch: true };
 
+	const LinkComponent = isExternal ? "a" : Link;
+
 	return (
-		<LinkComponent
-			{...linkProps}
-			aria-current={isActive ? "page" : undefined}
-			aria-label={`${name}${isExternal ? " (opens in new tab)" : ""}`}
-			className={cn(
-				"group flex min-w-0 items-center gap-3 border-transparent border-r-2 px-4 py-2.5 text-sm hover:text-sidebar-accent-foreground",
-				isActive
-					? "border-sidebar-ring bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-					: "text-sidebar-foreground/70 hover:bg-sidebar-accent"
-			)}
-			data-nav-href={href}
-			data-nav-item={name}
-			data-nav-section={sectionName || "main"}
-			data-track="navigation-item-click"
-			role="menuitem"
-		>
-			{content}
-			<div className="flex shrink-0 items-center gap-1.5">
-				{alpha && (
-					<span className="font-mono text-sidebar-foreground/50 text-xs">
-						ALPHA
-					</span>
-				)}
-				{tag && (
-					<span className="font-mono text-sidebar-foreground/50 text-xs uppercase">
-						{tag}
-					</span>
-				)}
-				{badge && (
-					<span
-						className={cn(
-							"rounded px-1.5 py-0.5 font-medium text-xs",
-							badge.variant === "purple" && "bg-accent text-accent-foreground",
-							badge.variant === "blue" && "bg-accent text-accent-foreground",
-							badge.variant === "green" && "bg-accent text-accent-foreground",
-							badge.variant === "orange" &&
-								"bg-amber-500/10 text-amber-600 dark:text-amber-500",
-							badge.variant === "red" && "bg-destructive/10 text-destructive"
-						)}
-					>
-						{badge.text}
-					</span>
-				)}
-				{isExternal && (
-					<ArrowSquareOutIcon
-						aria-hidden
-						className="size-3 text-sidebar-ring opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-						weight="duotone"
-					/>
-				)}
-			</div>
-		</LinkComponent>
+		<SidebarMenuItem>
+			<SidebarMenuButton asChild isActive={isActive} size="sm" tooltip={name}>
+				<LinkComponent
+					{...linkProps}
+					aria-label={`${name}${isExternal ? " (opens in new tab)" : ""}`}
+					data-track="navigation-item-click"
+				>
+					{iconElement}
+					<span className="truncate">{name}</span>
+					{trailingContent}
+				</LinkComponent>
+			</SidebarMenuButton>
+		</SidebarMenuItem>
 	);
 }

@@ -16,52 +16,52 @@ export function WebsiteHeader({
 	const displayName = website?.name || website?.domain;
 
 	return (
-		<div className="bg-sidebar-accent">
-			<div className="flex h-12 min-w-0 items-center gap-3 border-b px-3">
-				<div className="shrink-0 rounded-lg bg-sidebar/80 p-1.5 shadow-sm ring-1 ring-sidebar-border/50">
+		<div>
+			<div className="flex min-w-0 items-center gap-3 border-b border-sidebar-border px-4 py-2.5">
+				<div className="shrink-0 rounded bg-sidebar-accent p-1.5 ring-1 ring-sidebar-border/50">
 					<FaviconImage
 						altText={`${displayName || "Website"} favicon`}
-						className="size-5"
+						className="size-4"
 						domain={website?.domain || ""}
 						fallbackIcon={
 							<PlanetIcon
-								className="text-sidebar-ring"
-								size={20}
+								className="text-sidebar-foreground/70"
+								size={16}
 								weight="duotone"
 							/>
 						}
-						size={20}
+						size={16}
 					/>
 				</div>
-				<div className="min-w-0 flex-1 space-y-0.5">
+				<div className="min-w-0 flex-1">
 					{displayName ? (
-						<h2 className="truncate font-semibold text-sidebar-accent-foreground text-sm">
+						<p className="truncate font-medium text-sidebar-foreground text-sm">
 							{displayName}
-						</h2>
+						</p>
 					) : (
 						<Skeleton className="h-4 w-32" />
 					)}
 					{website?.domain ? (
-						<p className="truncate text-sidebar-accent-foreground/70 text-xs">
+						<p className="truncate text-sidebar-foreground/50 text-xs">
 							{website.domain}
 						</p>
 					) : (
-						<Skeleton className="h-3 w-24" />
+						<Skeleton className="mt-0.5 h-3 w-24" />
 					)}
 				</div>
 			</div>
 
 			{showBackButton && (
 				<Link
-					className="group flex h-10 min-w-0 items-center gap-2 border-b px-3 hover:bg-accent"
+					className="group flex min-w-0 items-center gap-1.5 border-b border-sidebar-border px-4 py-2 text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
 					href="/websites"
 				>
 					<CaretLeftIcon
-						className="size-3 shrink-0 text-sidebar-accent-foreground/80 transition-transform group-hover:-translate-x-0.5 group-hover:text-sidebar-accent-foreground"
+						className="size-3 shrink-0 transition-transform group-hover:-translate-x-0.5"
 						weight="fill"
 					/>
-					<span className="truncate font-semibold text-sidebar-accent-foreground/80 text-xs group-hover:text-sidebar-accent-foreground">
-						Back to Websites
+					<span className="truncate text-xs font-medium">
+						All websites
 					</span>
 				</Link>
 			)}

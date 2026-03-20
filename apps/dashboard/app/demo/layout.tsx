@@ -2,8 +2,9 @@
 
 import { AutumnProvider } from "autumn-js/react";
 import { parseAsBoolean, useQueryState } from "nuqs";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { BillingProvider } from "@/components/providers/billing-provider";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 function DemoLayoutContent({ children }: { children: React.ReactNode }) {
 	const [isEmbed] = useQueryState("embed", parseAsBoolean.withDefault(false));
@@ -19,14 +20,14 @@ function DemoLayoutContent({ children }: { children: React.ReactNode }) {
 	}
 
 	return (
-		<div className="h-dvh overflow-hidden text-foreground">
-			<Sidebar user={null} />
-			<div className="relative h-dvh pl-0 md:pl-76 lg:pl-84">
-				<div className="h-dvh overflow-y-auto overflow-x-hidden pt-16 md:pt-0">
+		<SidebarProvider>
+			<AppSidebar user={null} />
+			<SidebarInset>
+				<div className="flex-1 overflow-y-auto overflow-x-hidden">
 					{children}
 				</div>
-			</div>
-		</div>
+			</SidebarInset>
+		</SidebarProvider>
 	);
 }
 

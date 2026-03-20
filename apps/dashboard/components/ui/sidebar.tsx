@@ -1,7 +1,7 @@
 'use client';
 
 import { cva, type VariantProps } from 'class-variance-authority';
-import { PanelLeftIcon } from 'lucide-react';
+import { SidebarSimpleIcon } from '@phosphor-icons/react';
 import { Slot as SlotPrimitive } from 'radix-ui';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
@@ -272,7 +272,7 @@ function SidebarTrigger({
 			variant="ghost"
 			{...props}
 		>
-			<PanelLeftIcon />
+			<SidebarSimpleIcon weight="duotone" />
 			<span className="sr-only">Toggle Sidebar</span>
 		</Button>
 	);
@@ -308,7 +308,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
 		<main
 			className={cn(
 				'relative flex w-full flex-1 flex-col bg-background',
-				'md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm',
+				'md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-sidebar-border',
 				className
 			)}
 			data-slot="sidebar-inset"

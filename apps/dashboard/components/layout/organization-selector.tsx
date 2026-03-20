@@ -52,9 +52,9 @@ const getPlanDisplayInfo = (planId: PlanId | null) => {
 };
 
 const MENU_ITEM_BASE_CLASSES =
-	"flex h-10 cursor-pointer items-center gap-3 px-4 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground";
+	"flex h-9 cursor-pointer items-center gap-2.5 px-3 text-sm text-sidebar-foreground/70 hover:bg-accent/50 hover:text-foreground";
 const MENU_ITEM_ACTIVE_CLASSES =
-	"bg-sidebar-accent font-medium text-sidebar-accent-foreground";
+	"bg-accent font-medium text-foreground";
 
 function filterOrganizations<T extends { name: string; slug?: string | null }>(
 	orgs: T[] | undefined,
@@ -96,15 +96,15 @@ function OrganizationSelectorTrigger({
 	return (
 		<div
 			className={cn(
-				"flex h-12 w-full items-center overflow-hidden border-b bg-sidebar-accent px-3 py-3",
-				"hover:bg-sidebar-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
+				"flex w-full items-center overflow-hidden border-b border-sidebar-border px-4 py-2.5",
+				"hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
 				isSettingActiveOrganization ? "cursor-not-allowed opacity-70" : "",
-				isOpen ? "bg-sidebar-accent/60" : ""
+				isOpen ? "bg-sidebar-accent/40" : ""
 			)}
 		>
-			<div className="flex w-full min-w-0 items-center gap-2">
-				<div className="shrink-0 rounded">
-					<Avatar className="size-7 ring-1 ring-black/10 ring-inset">
+			<div className="flex w-full min-w-0 items-center gap-2.5">
+				<div className="shrink-0">
+					<Avatar className="size-7 rounded ring-1 ring-sidebar-border ring-inset">
 						<AvatarImage
 							alt={activeOrganization?.name ?? "Workspace"}
 							className="rounded"
@@ -112,7 +112,7 @@ function OrganizationSelectorTrigger({
 								activeOrganization?.logo || activeOrganization?.id
 							)}
 						/>
-						<AvatarFallback className="bg-secondary">
+						<AvatarFallback className="rounded bg-sidebar-accent">
 							<Image
 								alt={activeOrganization?.name ?? "Workspace"}
 								className="rounded"
@@ -126,32 +126,32 @@ function OrganizationSelectorTrigger({
 						</AvatarFallback>
 					</Avatar>
 				</div>
-				<div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
+				<div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 					<div className="flex min-w-0 items-center gap-2">
-						<span className="min-w-0 flex-1 truncate text-left font-semibold text-sidebar-accent-foreground text-sm">
+						<span className="min-w-0 flex-1 truncate text-left font-medium text-sidebar-foreground text-sm">
 							{activeOrganization?.name ?? "Select workspace"}
 						</span>
 						<Badge
-							className="shrink-0 py-1 text-xs leading-none"
+							className="shrink-0 py-0.5 text-[10px] leading-none"
 							variant={planInfo?.variant || "gray"}
 						>
 							{planInfo?.name || "Free"}
 						</Badge>
 					</div>
-					<p className="truncate text-left text-sidebar-accent-foreground/70 text-xs">
+					<p className="truncate text-left text-sidebar-foreground/50 text-xs">
 						{activeOrganization?.slug ?? "No workspace selected"}
 					</p>
 				</div>
 				{isSettingActiveOrganization ? (
 					<SpinnerGapIcon
 						aria-label="Switching workspace"
-						className="size-4 shrink-0 animate-spin text-sidebar-accent-foreground/60"
+						className="size-3.5 shrink-0 animate-spin text-sidebar-foreground/40"
 						weight="duotone"
 					/>
 				) : (
 					<CaretDownIcon
 						className={cn(
-							"size-4 shrink-0 text-sidebar-accent-foreground/60 transition-transform duration-200",
+							"size-3.5 shrink-0 text-sidebar-foreground/40 transition-transform duration-200",
 							isOpen ? "rotate-180" : ""
 						)}
 					/>
@@ -202,18 +202,13 @@ export function OrganizationSelector() {
 
 	if (isLoading) {
 		return (
-			<div className="flex h-12 w-full items-center border-b bg-sidebar-accent px-3 py-3">
-				<div className="flex w-full min-w-0 items-center justify-between">
-					<div className="flex min-w-0 items-center gap-3">
-						<div className="shrink-0 rounded-lg bg-sidebar/80 p-1.5 ring-1 ring-black/10 ring-inset">
-							<Skeleton className="size-5 rounded" />
-						</div>
-						<div className="flex min-w-0 flex-1 flex-col items-start">
-							<Skeleton className="h-4 w-24 rounded" />
-							<Skeleton className="mt-1 h-3 w-16 rounded" />
-						</div>
+			<div className="flex w-full items-center border-b border-sidebar-border px-4 py-2.5">
+				<div className="flex w-full min-w-0 items-center gap-2.5">
+					<Skeleton className="size-7 shrink-0 rounded" />
+					<div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+						<Skeleton className="h-3.5 w-24 rounded" />
+						<Skeleton className="h-3 w-16 rounded" />
 					</div>
-					<Skeleton className="size-4 shrink-0 rounded" />
 				</div>
 			</div>
 		);
@@ -249,8 +244,8 @@ export function OrganizationSelector() {
 				</DropdownMenuTrigger>
 				<DropdownMenuContent
 					align="start"
-					className="w-72 rounded-none border-t-0 border-r border-l-0 bg-sidebar p-0"
-					sideOffset={0}
+					className="w-64 p-1"
+					sideOffset={4}
 				>
 					{filteredOrganizations.length > 0 && (
 						<div className="flex flex-col">

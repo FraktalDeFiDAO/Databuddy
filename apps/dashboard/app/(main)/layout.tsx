@@ -1,9 +1,10 @@
 import { auth } from "@databuddy/auth";
 import { AutumnProvider } from "autumn-js/react";
 import { headers } from "next/headers";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { BillingProvider } from "@/components/providers/billing-provider";
 import { CommandSearchProvider } from "@/components/ui/command-search";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default async function MainLayout({
 	children,
@@ -27,15 +28,14 @@ export default async function MainLayout({
 		>
 			<BillingProvider>
 				<CommandSearchProvider>
-					<div className="h-dvh overflow-hidden text-foreground">
-						<Sidebar user={user} />
-						{/* <DevToolsDrawer /> */}
-						<div className="relative h-dvh pl-0 md:pl-76 lg:pl-84">
-							<div className="h-dvh overflow-y-auto overflow-x-hidden pt-12 md:pt-0">
+					<SidebarProvider>
+						<AppSidebar user={user} />
+						<SidebarInset>
+							<div className="flex-1 overflow-y-auto overflow-x-hidden">
 								{children}
 							</div>
-						</div>
-					</div>
+						</SidebarInset>
+					</SidebarProvider>
 				</CommandSearchProvider>
 			</BillingProvider>
 		</AutumnProvider>
