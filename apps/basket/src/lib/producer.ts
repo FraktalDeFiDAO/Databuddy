@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { clickHouse, TABLE_NAMES } from "@databuddy/db";
 import { captureError, record } from "@lib/tracing";
-import { log } from "evlog";
+import { createError, log } from "evlog";
 import { useLogger } from "evlog/elysia";
 import { CompressionTypes, Kafka, type Producer } from "kafkajs";
 
@@ -136,9 +136,12 @@ export class EventProducer {
 	private initializeProducer(): void {
 		if (!(this.config.username && this.config.password)) {
 			captureError(
-				new Error(
-					"REDPANDA_BROKER set but credentials missing. Kafka producer disabled."
-				)
+				createError({
+					message: "Kafka producer disabled: credentials missing",
+					status: 500,
+					why: "REDPANDA_BROKER was set without username and password.",
+					fix: "Set broker credentials or use ClickHouse-only mode.",
+				})
 			);
 			return;
 		}
@@ -194,7 +197,16 @@ export class EventProducer {
 				message: "Redpanda connection failed, using ClickHouse fallback",
 			});
 			if (this.dependencies.onError) {
-				this.dependencies.onError(new Error(String(error)));
+				const cause = error instanceof Error ? error : new Error(String(error));
+				this.dependencies.onError(
+					createError({
+						message: "Redpanda connection failed",
+						status: 500,
+						why: cause.message,
+						fix: "Check broker credentials, network, and broker health.",
+						cause,
+					})
+				);
 			}
 			return false;
 		}
@@ -282,9 +294,15 @@ export class EventProducer {
 
 			const failures = results.filter((r) => r.status === "rejected");
 			if (failures.length > 0) {
-				captureError(new Error("Table flush operations failed"), {
-					failures: failures.length,
-				});
+				captureError(
+					createError({
+						message: "Table flush operations failed",
+						status: 500,
+						why: `${String(failures.length)} flush operation(s) rejected.`,
+						fix: "Inspect ClickHouse connectivity and table configuration.",
+					}),
+					{ failures: failures.length }
+				);
 			}
 		} catch (error) {
 			this.stats.errors += 1;
@@ -315,22 +333,43 @@ export class EventProducer {
 
 	private toBuffer(topic: string, event: unknown): void {
 		if (this.shuttingDown) {
-			captureError(new Error("Cannot buffer event during shutdown"));
+			captureError(
+				createError({
+					message: "Cannot buffer event during shutdown",
+					status: 503,
+					why: "Producer is shutting down and new events are not accepted.",
+					fix: "During graceful shutdown, events may be dropped.",
+				})
+			);
 			return;
 		}
 
 		const table = this.dependencies.topicMap[topic];
 		if (!table) {
 			this.stats.errors += 1;
-			captureError(new Error("Unknown topic"), { topic });
+			captureError(
+				createError({
+					message: "Unknown Kafka topic",
+					status: 500,
+					why: "Topic is not mapped to a ClickHouse table.",
+					fix: "Check topicMap configuration.",
+				}),
+				{ topic }
+			);
 			return;
 		}
 
 		if (this.buffer.length >= this.config.bufferHardMax) {
 			this.stats.dropped += 1;
-			captureError(new Error("Buffer overflow, dropping event"), {
-				bufferLength: this.buffer.length,
-			});
+			captureError(
+				createError({
+					message: "Buffer overflow, dropping event",
+					status: 500,
+					why: "Internal buffer exceeded bufferHardMax.",
+					fix: "Investigate downstream slowness or increase buffer limits.",
+				}),
+				{ bufferLength: this.buffer.length }
+			);
 			return;
 		}
 

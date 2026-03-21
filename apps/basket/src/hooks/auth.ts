@@ -8,6 +8,7 @@
 import { and, db, eq, member, type Website, websites } from "@databuddy/db";
 import { cacheable } from "@databuddy/redis";
 import { captureError, record } from "@lib/tracing";
+import { createError, EvlogError } from "evlog";
 
 type WebsiteWithOwner = Website & {
 	ownerId: string | null;
@@ -191,14 +192,27 @@ export function normalizeDomain(domain: string): string {
 		const finalDomain = hostname.replace(REGEX_WWW_PREFIX, "");
 
 		if (!isValidDomainFormat(finalDomain)) {
-			throw new Error(
-				`Invalid domain format after normalization: ${finalDomain}`
-			);
+			throw createError({
+				message: `Invalid domain format after normalization: ${finalDomain}`,
+				status: 400,
+				why: "The domain failed format validation after extracting the hostname.",
+				fix: "Use a valid hostname (for example example.com).",
+			});
 		}
 		return finalDomain;
 	} catch (error) {
 		captureError(error, { message: "Failed to parse domain", domain });
-		throw new Error(`Invalid domain format: ${domain}`);
+		if (error instanceof EvlogError) {
+			throw error;
+		}
+		const cause = error instanceof Error ? error : new Error(String(error));
+		throw createError({
+			message: `Invalid domain format: ${domain}`,
+			status: 400,
+			why: cause.message,
+			fix: "Enter a valid domain or URL.",
+			cause,
+		});
 	}
 }
 

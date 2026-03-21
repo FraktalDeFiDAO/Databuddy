@@ -2,7 +2,16 @@ import { logBlockedTraffic } from "@lib/blocked-traffic";
 import { record } from "@lib/tracing";
 import { VALIDATION_LIMITS } from "@utils/validation";
 import { log } from "evlog";
+import { useLogger } from "evlog/elysia";
 import type { z } from "zod";
+
+function mergeValidationWideEvent(context: Record<string, unknown>): void {
+	try {
+		useLogger().set({ validation: context });
+	} catch {
+		log.info({ validation: context });
+	}
+}
 
 type ParseResult<T> =
 	| { success: true; data: T }
@@ -40,7 +49,7 @@ export function validateEventSchema<T>(
 				reason: "invalid_schema" as const,
 				issueCount: parseResult.error.issues.length,
 			};
-			log.info({ validation: validationContext });
+			mergeValidationWideEvent(validationContext);
 			return {
 				success: false,
 				error: { issues: parseResult.error.issues },

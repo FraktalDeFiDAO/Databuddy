@@ -17,8 +17,12 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { autumnHandler } from "autumn-js/elysia";
 import { Elysia } from "elysia";
 import { initLogger, log, parseError } from "evlog";
-import { createAxiomDrain } from "evlog/axiom";
 import { evlog, useLogger } from "evlog/elysia";
+import {
+	apiLoggerDrain,
+	enrichApiWideEvent,
+	flushBatchedApiDrain,
+} from "@/lib/evlog-api";
 import { agent } from "./routes/agent";
 import { health } from "./routes/health";
 import { insights } from "./routes/insights";
@@ -29,7 +33,11 @@ import { webhooks } from "./routes/webhooks/index";
 
 initLogger({
 	env: { service: "api" },
-	drain: createAxiomDrain(),
+	drain: apiLoggerDrain,
+	sampling: {
+		rates: { info: 20, warn: 50, debug: 5 },
+		keep: [{ status: 400 }, { duration: 1500 }],
+	},
 });
 setupUncaughtErrorHandlers();
 
@@ -217,7 +225,11 @@ const openApiHandler = new OpenAPIHandler(docsRouter, {
 });
 
 const app = new Elysia()
-	.use(evlog())
+	.use(
+		evlog({
+			enrich: enrichApiWideEvent,
+		})
+	)
 	.use(
 		cors({
 			credentials: true,
@@ -340,12 +352,24 @@ export default {
 	port: Number.parseInt(process.env.PORT ?? "3001", 10),
 };
 
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
 	log.info("lifecycle", "SIGINT received, shutting down gracefully");
+	await flushBatchedApiDrain().catch((error) =>
+		log.error({
+			lifecycle: "drainFlush",
+			error: error instanceof Error ? error.message : String(error),
+		})
+	);
 	process.exit(0);
 });
 
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
 	log.info("lifecycle", "SIGTERM received, shutting down gracefully");
+	await flushBatchedApiDrain().catch((error) =>
+		log.error({
+			lifecycle: "drainFlush",
+			error: error instanceof Error ? error.message : String(error),
+		})
+	);
 	process.exit(0);
 });

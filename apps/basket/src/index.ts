@@ -1,5 +1,10 @@
 import "./polyfills/compression";
 
+import {
+	basketLoggerDrain,
+	enrichBasketWideEvent,
+	flushBatchedAxiomDrain,
+} from "@lib/evlog-basket";
 import { disconnectProducer } from "@lib/producer";
 import { buildBasketErrorPayload } from "@lib/structured-errors";
 import { captureError } from "@lib/tracing";
@@ -11,12 +16,15 @@ import { stripeWebhook } from "@routes/webhooks/stripe";
 import { closeGeoIPReader } from "@utils/ip-geo";
 import { Elysia } from "elysia";
 import { initLogger, log } from "evlog";
-import { createAxiomDrain } from "evlog/axiom";
 import { evlog } from "evlog/elysia";
 
 initLogger({
 	env: { service: "basket" },
-	drain: createAxiomDrain(),
+	drain: basketLoggerDrain,
+	sampling: {
+		rates: { info: 20, warn: 50, debug: 5 },
+		keep: [{ status: 400 }, { duration: 1500 }],
+	},
 });
 
 process.on("unhandledRejection", (reason, _promise) => {
@@ -37,6 +45,12 @@ process.on("uncaughtException", (error) => {
 
 process.on("SIGTERM", async () => {
 	log.info("lifecycle", "SIGTERM received, shutting down gracefully");
+	await flushBatchedAxiomDrain().catch((error) =>
+		log.error({
+			lifecycle: "drainFlush",
+			error: error instanceof Error ? error.message : String(error),
+		})
+	);
 	await disconnectProducer().catch((error) =>
 		log.error({
 			lifecycle: "shutdown",
@@ -49,6 +63,12 @@ process.on("SIGTERM", async () => {
 
 process.on("SIGINT", async () => {
 	log.info("lifecycle", "SIGINT received, shutting down gracefully");
+	await flushBatchedAxiomDrain().catch((error) =>
+		log.error({
+			lifecycle: "drainFlush",
+			error: error instanceof Error ? error.message : String(error),
+		})
+	);
 	await disconnectProducer().catch((error) =>
 		log.error({
 			lifecycle: "shutdown",
@@ -60,7 +80,11 @@ process.on("SIGINT", async () => {
 });
 
 const app = new Elysia()
-	.use(evlog())
+	.use(
+		evlog({
+			enrich: enrichBasketWideEvent,
+		})
+	)
 	.onBeforeHandle(function handleCors({ request, set }) {
 		const origin = request.headers.get("origin");
 		if (origin) {

@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { cacheable } from "@databuddy/redis";
 import { captureError, record } from "@lib/tracing";
-import { log } from "evlog";
-import { useLogger } from "evlog/elysia";
 import type { City } from "@maxmind/geoip2-node";
 import {
 	AddressNotFoundError,
 	BadMethodCallError,
 	Reader,
 } from "@maxmind/geoip2-node";
+import { createError, EvlogError, log } from "evlog";
+import { useLogger } from "evlog/elysia";
 
 interface GeoIPReader extends Reader {
 	city(ip: string): City;
@@ -35,22 +35,40 @@ function loadDatabaseFromCdn(): Promise<Buffer> {
 		try {
 			const response = await fetch(CDN_URL);
 			if (!response.ok) {
-				throw new Error(
-					`Failed to fetch database from CDN: ${response.status} ${response.statusText}`
-				);
+				throw createError({
+					message: `Failed to fetch database from CDN: ${response.status} ${response.statusText}`,
+					status: 502,
+					why: "The GeoIP database CDN returned a non-success response.",
+					fix: "Retry later or verify CDN availability.",
+				});
 			}
 
 			const arrayBuffer = await response.arrayBuffer();
 			const buf = Buffer.from(arrayBuffer);
 
 			if (buf.length < 1_000_000) {
-				throw new Error(`Database file seems too small: ${buf.length} bytes`);
+				throw createError({
+					message: `Database file seems too small: ${buf.length} bytes`,
+					status: 502,
+					why: "The downloaded file is below the expected minimum size.",
+					fix: "Verify the CDN artifact is the full GeoLite2-City database.",
+				});
 			}
 
 			return buf;
 		} catch (error) {
 			captureError(error, { message: "Failed to load database from CDN" });
-			throw error;
+			if (error instanceof EvlogError) {
+				throw error;
+			}
+			const cause = error instanceof Error ? error : new Error(String(error));
+			throw createError({
+				message: "Failed to load GeoIP database from CDN",
+				status: 500,
+				why: cause.message,
+				fix: "Ensure the CDN is reachable and the database file is valid.",
+				cause,
+			});
 		}
 	});
 }
@@ -161,7 +179,7 @@ export function anonymizeIp(ip: string): string {
 	const salt = process.env.IP_HASH_SALT || "databuddy-ip-salt";
 	const hash = createHash("sha256");
 	hash.update(`${ip}${salt}`);
-	return hash.digest("hex").substring(0, 12);
+	return hash.digest("hex").slice(0, 12);
 }
 
 export function getGeo(ip: string, request?: Request) {
