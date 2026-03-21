@@ -1,13 +1,12 @@
 import { logBlockedTraffic } from "@lib/blocked-traffic";
 import { record } from "@lib/tracing";
-import { log } from "evlog";
-import { useLogger } from "evlog/elysia";
 import { VALIDATION_LIMITS } from "@utils/validation";
+import { log } from "evlog";
 import type { z } from "zod";
 
 type ParseResult<T> =
 	| { success: true; data: T }
-	| { success: false; error: { issues: z.ZodIssue[] } };
+	| { success: false; error: { issues: z.core.$ZodIssue[] } };
 
 /**
  * Validates event schema in production, skips validation in development
@@ -41,11 +40,7 @@ export function validateEventSchema<T>(
 				reason: "invalid_schema" as const,
 				issueCount: parseResult.error.issues.length,
 			};
-			try {
-				useLogger().set({ validation: validationContext });
-			} catch {
-				log.info({ validation: validationContext });
-			}
+			log.info({ validation: validationContext });
 			return {
 				success: false,
 				error: { issues: parseResult.error.issues },
@@ -56,39 +51,29 @@ export function validateEventSchema<T>(
 	});
 }
 
-/**
- * Standard error response for schema validation failures
- */
-export function createSchemaErrorResponse(errors: z.ZodIssue[]) {
-	return new Response(
-		JSON.stringify({
-			status: "error",
-			message: "Invalid event schema",
-			errors,
-		}),
-		{
-			status: 400,
-			headers: { "Content-Type": "application/json" },
-		}
-	);
+/** Per-item batch result when schema validation fails */
+export function batchSchemaItemFailure(
+	issues: z.core.$ZodIssue[],
+	eventType: string,
+	eventId: unknown
+) {
+	return {
+		status: "error" as const,
+		message: "Invalid event schema",
+		errors: issues,
+		eventType,
+		eventId,
+	};
 }
 
-/**
- * Standard error response for bot detection
- */
-export function createBotDetectedResponse(eventType: string) {
-	return new Response(
-		JSON.stringify({
-			status: "error",
-			message: "Bot detected",
-			eventType,
-			error: "ignored",
-		}),
-		{
-			status: 200,
-			headers: { "Content-Type": "application/json" },
-		}
-	);
+/** Per-item batch result when request is treated as bot (ignored) */
+export function batchBotIgnoredItem(eventType: string) {
+	return {
+		status: "error" as const,
+		message: "Bot detected",
+		eventType,
+		error: "ignored" as const,
+	};
 }
 
 /**

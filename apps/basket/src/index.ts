@@ -1,6 +1,7 @@
 import "./polyfills/compression";
 
 import { disconnectProducer } from "@lib/producer";
+import { buildBasketErrorPayload } from "@lib/structured-errors";
 import { captureError } from "@lib/tracing";
 import basketRouter from "@routes/basket";
 import llmRouter from "@routes/llm";
@@ -76,7 +77,17 @@ const app = new Elysia()
 		if (code === "NOT_FOUND") {
 			return new Response(null, { status: 404 });
 		}
+
 		captureError(error);
+
+		const { status, payload } = buildBasketErrorPayload(error, {
+			elysiaCode: code ?? "INTERNAL_SERVER_ERROR",
+		});
+
+		return new Response(JSON.stringify(payload), {
+			status,
+			headers: { "Content-Type": "application/json" },
+		});
 	})
 	.options("*", () => new Response(null, { status: 204 }))
 	.use(basketRouter)
