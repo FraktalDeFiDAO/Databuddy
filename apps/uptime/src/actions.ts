@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { connect } from "node:tls";
 import { db, eq, uptimeSchedules } from "@databuddy/db";
-import { type JsonParsingConfig, parseJsonResponse } from "./json-parser";
+import { extractHealth, isHealthExtractionEnabled } from "./json-parser";
 import { captureError, mergeWideEvent, record } from "./lib/tracing";
 import type { ActionResult, UptimeData } from "./types";
 import { MonitorStatus } from "./types";
@@ -93,7 +93,9 @@ export function lookupSchedule(
 				db_schedule_loaded: true,
 				schedule_cache_bust: schedule.cacheBust,
 				schedule_timeout_ms: schedule.timeout ?? 0,
-				json_parsing_enabled: schedule.jsonParsingConfig != null,
+				json_parsing_enabled: isHealthExtractionEnabled(
+					schedule.jsonParsingConfig
+				),
 			});
 
 			return {
@@ -392,7 +394,7 @@ function getProbeMetadata(): Promise<{ ip: string; region: string }> {
 export interface CheckOptions {
 	timeout?: number;
 	cacheBust?: boolean;
-	jsonParsingConfig?: JsonParsingConfig | null;
+	extractHealth?: boolean;
 }
 
 export function checkUptime(
@@ -454,12 +456,8 @@ export function checkUptime(
 				),
 			]);
 
-			const jsonData = options.jsonParsingConfig
-				? parseJsonResponse(
-						pingResult.parsedJson ?? pingResult.content,
-						pingResult.contentType,
-						options.jsonParsingConfig
-					)
+			const jsonData = options.extractHealth
+				? extractHealth(pingResult.parsedJson ?? pingResult.content)
 				: null;
 
 			const data: UptimeData = {

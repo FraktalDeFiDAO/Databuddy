@@ -119,8 +119,70 @@ const app = new Elysia()
 	.use(trackRoute)
 	.use(stripeWebhook)
 	.use(paddleWebhook)
-	.get("/health", function healthCheck() {
-		return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+	.get("/health", async function healthCheck() {
+		const { clickHouseOG } = await import("@databuddy/db");
+		const { Kafka } = await import("kafkajs");
+
+		async function ping(probe: () => Promise<void>) {
+			const start = performance.now();
+			try {
+				await probe();
+				return {
+					status: "ok" as const,
+					latency_ms: Math.round(performance.now() - start),
+				};
+			} catch (err) {
+				return {
+					status: "error" as const,
+					latency_ms: Math.round(performance.now() - start),
+					error: err instanceof Error ? err.message : "unknown",
+				};
+			}
+		}
+
+		const [clickhouse, redpanda] = await Promise.all([
+			ping(async () => {
+				const { success } = await clickHouseOG.ping();
+				if (!success) {
+					throw new Error("ping failed");
+				}
+			}),
+			ping(async () => {
+				const broker = process.env.REDPANDA_BROKER;
+				if (!broker) {
+					throw new Error("not configured");
+				}
+				const kafka = new Kafka({
+					clientId: "health",
+					brokers: [broker],
+					connectionTimeout: 5000,
+					...(process.env.REDPANDA_USER &&
+						process.env.REDPANDA_PASSWORD && {
+							sasl: {
+								mechanism: "scram-sha-256",
+								username: process.env.REDPANDA_USER,
+								password: process.env.REDPANDA_PASSWORD,
+							},
+							ssl: false,
+						}),
+				});
+				const admin = kafka.admin();
+				try {
+					await admin.connect();
+				} finally {
+					await admin.disconnect().catch(() => {});
+				}
+			}),
+		]);
+
+		const services = { clickhouse, redpanda };
+		const status = Object.values(services).every((s) => s.status === "ok")
+			? "ok"
+			: "degraded";
+		return Response.json(
+			{ status, services },
+			{ status: status === "ok" ? 200 : 503 }
+		);
 	});
 
 const port = process.env.PORT || 4000;

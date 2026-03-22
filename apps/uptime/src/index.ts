@@ -4,7 +4,7 @@ import { initLogger, log } from "evlog";
 import { evlog } from "evlog/elysia";
 import { z } from "zod";
 import { type CheckOptions, checkUptime, lookupSchedule } from "./actions";
-import type { JsonParsingConfig } from "./json-parser";
+import { isHealthExtractionEnabled } from "./json-parser";
 import {
 	enrichUptimeWideEvent,
 	flushBatchedUptimeDrain,
@@ -90,7 +90,66 @@ const app = new Elysia()
 			elysia_code: String(code),
 		});
 	})
-	.get("/health", () => ({ status: "ok" }))
+	.get("/health", async () => {
+		const { db, sql } = await import("@databuddy/db");
+		const { Kafka } = await import("kafkajs");
+
+		async function ping(probe: () => Promise<void>) {
+			const start = performance.now();
+			try {
+				await probe();
+				return {
+					status: "ok" as const,
+					latency_ms: Math.round(performance.now() - start),
+				};
+			} catch (err) {
+				return {
+					status: "error" as const,
+					latency_ms: Math.round(performance.now() - start),
+					error: err instanceof Error ? err.message : "unknown",
+				};
+			}
+		}
+
+		const [postgres, redpanda] = await Promise.all([
+			ping(() => db.execute(sql`SELECT 1`).then(() => {})),
+			ping(async () => {
+				const broker = process.env.REDPANDA_BROKER;
+				if (!broker) {
+					throw new Error("not configured");
+				}
+				const kafka = new Kafka({
+					clientId: "health",
+					brokers: [broker],
+					connectionTimeout: 5000,
+					...(process.env.REDPANDA_USER &&
+						process.env.REDPANDA_PASSWORD && {
+							sasl: {
+								mechanism: "scram-sha-256",
+								username: process.env.REDPANDA_USER,
+								password: process.env.REDPANDA_PASSWORD,
+							},
+							ssl: false,
+						}),
+				});
+				const admin = kafka.admin();
+				try {
+					await admin.connect();
+				} finally {
+					await admin.disconnect().catch(() => {});
+				}
+			}),
+		]);
+
+		const services = { postgres, redpanda };
+		const status = Object.values(services).every((s) => s.status === "ok")
+			? "ok"
+			: "degraded";
+		return Response.json(
+			{ status, services },
+			{ status: status === "ok" ? 200 : 503 }
+		);
+	})
 	.post("/", async ({ headers, body }) => {
 		try {
 			const headerSchema = z.object({
@@ -173,8 +232,9 @@ const app = new Elysia()
 			const options: CheckOptions = {
 				timeout: schedule.data.timeout ?? undefined,
 				cacheBust: schedule.data.cacheBust,
-				jsonParsingConfig: schedule.data
-					.jsonParsingConfig as JsonParsingConfig | null,
+				extractHealth: isHealthExtractionEnabled(
+					schedule.data.jsonParsingConfig
+				),
 			};
 
 			const result = await checkUptime(

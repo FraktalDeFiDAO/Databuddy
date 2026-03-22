@@ -207,8 +207,6 @@ export const uptimeRouter = {
 				jsonParsingConfig: z
 					.object({
 						enabled: z.boolean(),
-						mode: z.enum(["auto", "manual"]),
-						fields: z.array(z.string()).optional(),
 					})
 					.optional(),
 			})
@@ -247,7 +245,7 @@ export const uptimeRouter = {
 				isPaused: false,
 				timeout: input.timeout ?? null,
 				cacheBust: input.cacheBust ?? false,
-				jsonParsingConfig: input.jsonParsingConfig ?? null,
+				jsonParsingConfig: input.jsonParsingConfig ?? { enabled: true },
 			});
 
 			try {
@@ -294,8 +292,6 @@ export const uptimeRouter = {
 				jsonParsingConfig: z
 					.object({
 						enabled: z.boolean(),
-						mode: z.enum(["auto", "manual"]),
-						fields: z.array(z.string()).optional(),
 					})
 					.optional(),
 			})
