@@ -27,6 +27,7 @@ export interface Flag {
 	organizationId?: string | null;
 	userId?: string | null;
 	createdBy: string;
+	folder?: string | null;
 	createdAt: Date;
 	updatedAt: Date;
 	deletedAt?: Date | null;

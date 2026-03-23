@@ -248,6 +248,7 @@ export function FlagSheet({
 				dependencies: [],
 				environment: undefined,
 				targetGroupIds: [],
+				folder: undefined,
 			},
 			schedule: undefined,
 		},
@@ -290,6 +291,7 @@ export function FlagSheet({
 					dependencies: flag.dependencies ?? [],
 					environment: flag.environment || undefined,
 					targetGroupIds: extractTargetGroupIds(),
+					folder: flag.folder || undefined,
 				},
 				schedule: undefined,
 			});
@@ -311,6 +313,7 @@ export function FlagSheet({
 					variants: template.type === "multivariant" ? template.variants : [],
 					dependencies: [],
 					targetGroupIds: [],
+					folder: undefined,
 				},
 				schedule: undefined,
 			});
@@ -332,6 +335,7 @@ export function FlagSheet({
 					variants: [],
 					dependencies: [],
 					targetGroupIds: [],
+					folder: undefined,
 				},
 				schedule: undefined,
 			});
@@ -546,6 +550,32 @@ export function FlagSheet({
 												/>
 											</FormControl>
 											<FormMessage />
+										</FormItem>
+									)}
+								/>
+
+								<FormField
+									control={form.control}
+									name="flag.folder"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel className="text-muted-foreground">
+												Folder (optional)
+											</FormLabel>
+											<FormControl>
+												<Input
+													placeholder="e.g., auth/login, checkout/payment"
+													{...field}
+													onChange={(e) =>
+														field.onChange(e.target.value || null)
+													}
+													value={field.value ?? ""}
+												/>
+											</FormControl>
+											<FormMessage />
+											<p className="text-muted-foreground text-xs">
+												Use slashes for nested folders (e.g., auth/login)
+											</p>
 										</FormItem>
 									)}
 								/>

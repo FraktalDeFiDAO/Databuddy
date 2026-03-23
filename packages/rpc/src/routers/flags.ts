@@ -29,11 +29,11 @@ import { z } from "zod";
 import { rpcError } from "../errors";
 import type { Context } from "../orpc";
 import { protectedProcedure, publicProcedure } from "../orpc";
+import { isFullyAuthorized, withWorkspace } from "../procedures/with-workspace";
 import {
-	isFullyAuthorized,
-	withWorkspace,
-} from "../procedures/with-workspace";
-import { requireFeatureWithLimit, requireUsageWithinLimit } from "../types/billing";
+	requireFeatureWithLimit,
+	requireUsageWithinLimit,
+} from "../types/billing";
 import { getCacheAuthContext } from "../utils/cache-keys";
 
 const flagsCache = createDrizzleCache({ redis, namespace: "flags" });
@@ -101,6 +101,7 @@ const createFlagSchema = z
 		organizationId: z.string().optional(),
 		payload: z.any().optional(),
 		persistAcrossAuth: z.boolean().optional(),
+		folder: z.string().max(200, "Folder path too long").optional(),
 		...flagFormSchema.shape,
 	})
 	.refine((data) => data.websiteId || data.organizationId, {
@@ -125,6 +126,7 @@ const updateFlagSchema = z
 		dependencies: z.array(z.string()).optional(),
 		environment: z.string().optional(),
 		targetGroupIds: z.array(z.string()).optional(),
+		folder: z.string().max(200, "Folder path too long").optional(),
 	})
 	.superRefine((data, ctx) => {
 		if (data.type === "multivariant" && data.variants) {
@@ -225,7 +227,7 @@ function sanitizeFlagForDemo<T extends FlagWithTargetGroups>(flag: T): T {
 		...flag,
 		rules: Array.isArray(flag.rules) && flag.rules.length > 0 ? [] : flag.rules,
 		targetGroups: flag.targetGroups?.map(
-			(group: { rules?: unknown;[key: string]: unknown }) => ({
+			(group: { rules?: unknown; [key: string]: unknown }) => ({
 				...group,
 				rules:
 					Array.isArray(group.rules) && group.rules.length > 0
@@ -479,14 +481,14 @@ export const flagsRouter = {
 
 			const workspace = wsId
 				? await withWorkspace(context, {
-					websiteId: wsId,
-					permissions: ["update"],
-				})
+						websiteId: wsId,
+						permissions: ["update"],
+					})
 				: await withWorkspace(context, {
-					organizationId: orgId,
-					resource: "website",
-					permissions: ["create"],
-				});
+						organizationId: orgId,
+						resource: "website",
+						permissions: ["create"],
+					});
 
 			const createdBy = await workspace.getCreatedBy();
 
@@ -572,6 +574,7 @@ export const flagsRouter = {
 							variants: input.variants,
 							dependencies: input.dependencies,
 							environment: input.environment,
+							folder: input.folder ?? existingFlag[0].folder,
 							deletedAt: null,
 							updatedAt: new Date(),
 						})
@@ -629,6 +632,7 @@ export const flagsRouter = {
 						websiteId: input.websiteId || null,
 						organizationId: input.organizationId || null,
 						environment: input.environment || existingFlag?.[0]?.environment,
+						folder: input.folder || null,
 						userId: null,
 						createdBy,
 					})
@@ -696,23 +700,22 @@ export const flagsRouter = {
 
 			const flag = existingFlag[0];
 
-			let workspace;
-			if (flag.websiteId) {
-				workspace = await withWorkspace(context, {
-					websiteId: flag.websiteId,
-					permissions: ["update"],
-				});
-			} else if (flag.organizationId) {
-				workspace = await withWorkspace(context, {
-					organizationId: flag.organizationId,
-					resource: "website",
-					permissions: ["create"],
-				});
-			} else {
-				throw rpcError.forbidden(
-					"Flags must be scoped to a website or organization"
-				);
-			}
+			const workspace = flag.websiteId
+				? await withWorkspace(context, {
+						websiteId: flag.websiteId,
+						permissions: ["update"],
+					})
+				: flag.organizationId
+					? await withWorkspace(context, {
+							organizationId: flag.organizationId,
+							resource: "website",
+							permissions: ["create"],
+						})
+					: (() => {
+							throw rpcError.forbidden(
+								"Flags must be scoped to a website or organization"
+							);
+						})();
 
 			const isUnarchiving =
 				flag.status === "archived" &&

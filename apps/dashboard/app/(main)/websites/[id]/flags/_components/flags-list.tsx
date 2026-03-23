@@ -2,9 +2,12 @@
 
 import {
 	ArchiveIcon,
+	CaretDownIcon,
+	CaretRightIcon,
 	DotsThreeIcon,
 	FlagIcon,
 	FlaskIcon,
+	Folder,
 	GaugeIcon,
 	LinkIcon,
 	PencilSimpleIcon,
@@ -12,7 +15,7 @@ import {
 	TrashIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +44,13 @@ interface FlagsListProps {
 	groups: Map<string, TargetGroup[]>;
 	onEdit: (flag: Flag) => void;
 	onDelete: (flagId: string) => void;
+}
+
+interface FolderGroup {
+	name: string;
+	path: string;
+	flags: Flag[];
+	children: Map<string, FolderGroup>;
 }
 
 const TYPE_CONFIG = {
@@ -359,7 +369,7 @@ function FlagRow({
 					<div className="flex flex-col gap-0.5 text-muted-foreground text-xs">
 						{ruleCount > 0 && (
 							<span>
-								{ruleCount} {ruleCount !== 1 ? "rules" : "rule"}
+								{ruleCount} {ruleCount === 1 ? "rule" : "rules"}
 							</span>
 						)}
 						{variantCount > 0 && (
@@ -427,21 +437,238 @@ export function FlagsList({ flags, groups, onEdit, onDelete }: FlagsListProps) {
 		return map;
 	}, [flags]);
 
+	// Group flags by folder
+	const folderGroups = useMemo(() => {
+		const root: FolderGroup = {
+			name: "Root",
+			path: "",
+			flags: [],
+			children: new Map(),
+		};
+
+		for (const flag of flags) {
+			if (flag.folder) {
+				const parts = flag.folder.split("/");
+				let currentNode = root;
+
+				for (let i = 0; i < parts.length; i++) {
+					const part = parts[i];
+					const currentPath = parts.slice(0, i + 1).join("/");
+
+					if (!currentNode.children.has(part)) {
+						currentNode.children.set(part, {
+							name: part,
+							path: currentPath,
+							flags: [],
+							children: new Map(),
+						});
+					}
+
+					const nextNode = currentNode.children.get(part);
+					if (nextNode) {
+						currentNode = nextNode;
+					}
+				}
+
+				currentNode.flags.push(flag);
+			} else {
+				root.flags.push(flag);
+			}
+		}
+
+		return root;
+	}, [flags]);
+
 	return (
 		<div className="w-full overflow-x-auto">
-			{flags.map((flag) => (
-				<FlagRow
-					dependents={dependentsMap.get(flag.key) ?? []}
-					flag={flag}
+			{/* Uncategorized flags */}
+			{folderGroups.flags.length > 0 && (
+				<div className="mb-4">
+					<div className="mb-2 flex items-center gap-2 px-4">
+						<FlagIcon
+							className="size-4 text-muted-foreground"
+							weight="duotone"
+						/>
+						<span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
+							Uncategorized ({folderGroups.flags.length})
+						</span>
+					</div>
+					{folderGroups.flags.map((flag) => (
+						<FlagRow
+							dependents={dependentsMap.get(flag.key) ?? []}
+							flag={flag}
+							flagMap={flagMap}
+							groups={groups.get(flag.id) ?? []}
+							key={flag.id}
+							onDelete={onDelete}
+							onEdit={onEdit}
+						/>
+					))}
+				</div>
+			)}
+
+			{/* Folder groups */}
+			{Array.from(folderGroups.children.values()).map((folder) => (
+				<FolderSection
+					dependentsMap={dependentsMap}
 					flagMap={flagMap}
-					groups={groups.get(flag.id) ?? []}
-					key={flag.id}
+					folder={folder}
+					groups={groups}
+					key={folder.path}
 					onDelete={onDelete}
 					onEdit={onEdit}
 				/>
 			))}
 		</div>
 	);
+}
+
+function FolderSection({
+	folder,
+	flagMap,
+	dependentsMap,
+	groups,
+	onEdit,
+	onDelete,
+}: {
+	folder: FolderGroup;
+	flagMap: Map<string, Flag>;
+	dependentsMap: Map<string, Flag[]>;
+	groups: Map<string, TargetGroup[]>;
+	onEdit: (flag: Flag) => void;
+	onDelete: (flagId: string) => void;
+}) {
+	const [isExpanded, setIsExpanded] = useState(true);
+	const totalFlags = countAllFlags(folder);
+
+	return (
+		<div className="mb-4">
+			<button
+				className="flex w-full items-center gap-2 border-b bg-muted/30 px-4 py-2 transition-colors hover:bg-muted/50"
+				onClick={() => setIsExpanded(!isExpanded)}
+				type="button"
+			>
+				{isExpanded ? (
+					<CaretDownIcon className="size-4 text-muted-foreground" />
+				) : (
+					<CaretRightIcon className="size-4 text-muted-foreground" />
+				)}
+				<Folder className="size-4 text-primary" weight="duotone" />
+				<span className="font-medium text-sm">{folder.name}</span>
+				<Badge className="ml-auto" variant="secondary">
+					{totalFlags}
+				</Badge>
+			</button>
+
+			{isExpanded && (
+				<div>
+					{/* Direct flags in this folder */}
+					{folder.flags.map((flag) => (
+						<FlagRow
+							dependents={dependentsMap.get(flag.key) ?? []}
+							flag={flag}
+							flagMap={flagMap}
+							groups={groups.get(flag.id) ?? []}
+							key={flag.id}
+							onDelete={onDelete}
+							onEdit={onEdit}
+						/>
+					))}
+
+					{/* Nested folders */}
+					{Array.from(folder.children.values()).map((childFolder) => (
+						<NestedFolderSection
+							dependentsMap={dependentsMap}
+							flagMap={flagMap}
+							folder={childFolder}
+							groups={groups}
+							key={childFolder.path}
+							onDelete={onDelete}
+							onEdit={onEdit}
+						/>
+					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function NestedFolderSection({
+	folder,
+	flagMap,
+	dependentsMap,
+	groups,
+	onEdit,
+	onDelete,
+}: {
+	folder: FolderGroup;
+	flagMap: Map<string, Flag>;
+	dependentsMap: Map<string, Flag[]>;
+	groups: Map<string, TargetGroup[]>;
+	onEdit: (flag: Flag) => void;
+	onDelete: (flagId: string) => void;
+}) {
+	const [isExpanded, setIsExpanded] = useState(true);
+	const totalFlags = countAllFlags(folder);
+
+	return (
+		<div>
+			<button
+				className="flex w-full items-center gap-2 border-b bg-background px-6 py-2 pl-8 transition-colors hover:bg-accent/50"
+				onClick={() => setIsExpanded(!isExpanded)}
+				type="button"
+			>
+				{isExpanded ? (
+					<CaretDownIcon className="size-4 text-muted-foreground" />
+				) : (
+					<CaretRightIcon className="size-4 text-muted-foreground" />
+				)}
+				<Folder className="size-4 text-muted-foreground" weight="duotone" />
+				<span className="font-medium text-muted-foreground text-sm">
+					{folder.name}
+				</span>
+				<Badge className="ml-auto" variant="outline">
+					{totalFlags}
+				</Badge>
+			</button>
+
+			{isExpanded && (
+				<div>
+					{folder.flags.map((flag) => (
+						<FlagRow
+							dependents={dependentsMap.get(flag.key) ?? []}
+							flag={flag}
+							flagMap={flagMap}
+							groups={groups.get(flag.id) ?? []}
+							key={flag.id}
+							onDelete={onDelete}
+							onEdit={onEdit}
+						/>
+					))}
+
+					{Array.from(folder.children.values()).map((childFolder) => (
+						<NestedFolderSection
+							dependentsMap={dependentsMap}
+							flagMap={flagMap}
+							folder={childFolder}
+							groups={groups}
+							key={childFolder.path}
+							onDelete={onDelete}
+							onEdit={onEdit}
+						/>
+					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function countAllFlags(folder: FolderGroup): number {
+	let count = folder.flags.length;
+	for (const child of folder.children.values()) {
+		count += countAllFlags(child);
+	}
+	return count;
 }
 
 export function FlagsListSkeleton() {

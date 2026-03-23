@@ -62,6 +62,7 @@ export const flagFormSchema = z
 			.optional(),
 		environment: z.string().nullable().optional(),
 		targetGroupIds: z.array(z.string()).optional(),
+		folder: z.string().max(200, "Folder path too long").optional(),
 	})
 	.superRefine((data, ctx) => {
 		if (data.type === "multivariant" && data.variants) {
@@ -116,38 +117,7 @@ export const flagScheduleSchema = z
 		if (!data.isEnabled) {
 			return;
 		}
-		if (data.type !== "update_rollout") {
-			if (data.rolloutSteps && data?.rolloutSteps?.length > 0) {
-				ctx.addIssue({
-					code: "custom",
-					path: ["rolloutSteps"],
-					message: "Rollout steps allowed only for update_rollout type",
-				});
-			}
-			if (!data.scheduledAt) {
-				ctx.addIssue({
-					code: "custom",
-					path: ["scheduledAt"],
-					message: "Date time is required for enable/disable schedule types",
-				});
-			}
-			const scheduledDate = new Date(data.scheduledAt ?? "");
-			if (Number.isNaN(scheduledDate.getTime())) {
-				ctx.addIssue({
-					code: "custom",
-					path: ["scheduledAt"],
-					message: "Invalid schedule date",
-				});
-			}
-
-			if (Date.now() > new Date(data.scheduledAt ?? "").getTime()) {
-				ctx.addIssue({
-					code: "custom",
-					path: ["scheduledAt"],
-					message: "Scheduled time must be in the future",
-				});
-			}
-		} else {
+		if (data.type === "update_rollout") {
 			if (data.scheduledAt) {
 				ctx.addIssue({
 					code: "custom",
@@ -190,6 +160,37 @@ export const flagScheduleSchema = z
 						message: "Scheduled time must be in the future",
 					});
 				}
+			}
+		} else {
+			if (data.rolloutSteps && data?.rolloutSteps?.length > 0) {
+				ctx.addIssue({
+					code: "custom",
+					path: ["rolloutSteps"],
+					message: "Rollout steps allowed only for update_rollout type",
+				});
+			}
+			if (!data.scheduledAt) {
+				ctx.addIssue({
+					code: "custom",
+					path: ["scheduledAt"],
+					message: "Date time is required for enable/disable schedule types",
+				});
+			}
+			const scheduledDate = new Date(data.scheduledAt ?? "");
+			if (Number.isNaN(scheduledDate.getTime())) {
+				ctx.addIssue({
+					code: "custom",
+					path: ["scheduledAt"],
+					message: "Invalid schedule date",
+				});
+			}
+
+			if (Date.now() > new Date(data.scheduledAt ?? "").getTime()) {
+				ctx.addIssue({
+					code: "custom",
+					path: ["scheduledAt"],
+					message: "Scheduled time must be in the future",
+				});
 			}
 		}
 	});
