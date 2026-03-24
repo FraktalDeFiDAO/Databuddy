@@ -50,6 +50,7 @@ import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 import { GroupSelector } from "../groups/_components/group-selector";
 import { DependencySelector } from "./dependency-selector";
+import { FolderSelector } from "./folder-selector";
 import type { Flag, FlagSheetProps, TargetGroup } from "./types";
 import { UserRulesBuilder } from "./user-rules-builder";
 import { VariantEditor } from "./variant-editor";
@@ -563,18 +564,25 @@ export function FlagSheet({
 												Folder (optional)
 											</FormLabel>
 											<FormControl>
-												<Input
-													placeholder="e.g., auth/login, checkout/payment"
-													{...field}
-													onChange={(e) =>
-														field.onChange(e.target.value || null)
+												<FolderSelector
+													value={field.value ?? null}
+													onChange={(folder) =>
+														field.onChange(folder ?? null)
 													}
-													value={field.value ?? ""}
+													placeholder="Select or create a folder…"
+													availableFolders={
+														flagsList
+															?.map((f) => f.folder)
+															.filter((f): f is string => Boolean(f)) ?? []
+													}
+													onCreateFolder={(newFolder) => {
+														field.onChange(newFolder);
+													}}
 												/>
 											</FormControl>
 											<FormMessage />
 											<p className="text-muted-foreground text-xs">
-												Use slashes for nested folders (e.g., auth/login)
+												Organize flags into folders for better management
 											</p>
 										</FormItem>
 									)}
