@@ -74,6 +74,16 @@ export function FolderSelector({
 		return options;
 	}, [availableFolders, value]);
 
+	// Filter folders based on search
+	const filteredOptions = useMemo(() => {
+		if (!searchValue.trim()) {
+			return folderOptions;
+		}
+		return folderOptions.filter((option) =>
+			option.label.toLowerCase().includes(searchValue.toLowerCase())
+		);
+	}, [folderOptions, searchValue]);
+
 	// Get parent folders for display
 	const getFolderDisplay = (folder: string) => {
 		const parts = folder.split("/");
@@ -118,7 +128,7 @@ export function FolderSelector({
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-[300px] p-0">
-				<Command shouldFilter={false}>
+				<Command shouldFilter={true}>
 					<CommandInput
 						onValueChange={setSearchValue}
 						placeholder="Search folders..."
@@ -161,7 +171,7 @@ export function FolderSelector({
 							</CommandItem>
 
 							{/* Existing Folders */}
-							{folderOptions.map((option) => (
+							{filteredOptions.map((option) => (
 								<CommandItem
 									key={option.value}
 									onSelect={() => handleSelect(option.value)}
